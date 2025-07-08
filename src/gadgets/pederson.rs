@@ -1,0 +1,151 @@
+use ark_ec::{CurveGroup, ScalarMul, VariableBaseMSM};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+
+#[derive(Debug, Clone)]
+pub struct Pedersen<G: CurveGroup> {
+    pub generators: Vec<G::MulBase>,
+}
+
+impl<G: CurveGroup> Pedersen<G>
+where
+    G::MulBase: CanonicalSerialize + CanonicalDeserialize,
+{
+    /// Create a new Pedersen commitment instance with `n` generators.
+    /// The generators are deterministically derived from the label.
+    pub fn new(n: usize) -> Self {
+        let mut rng = ark_std::test_rng();
+
+        // Sample random group elements
+        let mut gens = Vec::with_capacity(n);
+        for _ in 0..n {
+            gens.push(G::rand(&mut rng));
+        }
+
+        let mul_bases = ScalarMul::batch_convert_to_mul_base(&gens);
+
+        Pedersen {
+            generators: mul_bases,
+        }
+    }
+
+    /// Commit to a vector of scalars.
+    /// The length of `scalars` must be less than or equal to the number of generators.
+    pub fn commit(&self, scalars: &[G::ScalarField]) -> G {
+        assert!(
+            scalars.len() <= self.generators.len(),
+            "Too many scalars for the number of generators"
+        );
+
+        // Only use as many generators as needed
+        VariableBaseMSM::msm_unchecked(&self.generators[..scalars.len()], scalars)
+    }
+
+    /// Sparse commitment: terms are (index, scalar) pairs.
+    /// Much faster when the vector is sparse compared to full MSM.
+    pub fn commit_sparse(&self, terms: &[(usize, G::ScalarField)]) -> G {
+        for (i, _) in terms.iter() {
+            assert!(
+                *i < self.generators.len(),
+                "Index {} out of bounds for number of generators {}",
+                i,
+                self.generators.len()
+            );
+        }
+
+        let bases: Vec<G::MulBase> = terms.iter().map(|(i, _)| self.generators[*i]).collect();
+        let scalars: Vec<G::ScalarField> = terms.iter().map(|(_, s)| *s).collect();
+
+        VariableBaseMSM::msm_unchecked(&bases, &scalars)
+    }
+
+    /// Get the number of generators
+    pub fn num_generators(&self) -> usize {
+        self.generators.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ark_bls12_381::{Fr, G1Projective};
+    use ark_ff::Zero;
+    use ark_std::{test_rng, UniformRand};
+
+    #[test]
+    fn test_commitment_consistency() {
+        let pedersen = Pedersen::<G1Projective>::new(4);
+
+        let mut rng = test_rng();
+        let scalars: Vec<Fr> = (0..4).map(|_| Fr::rand(&mut rng)).collect();
+
+        let commitment1 = pedersen.commit(&scalars);
+        let commitment2 = pedersen.commit(&scalars);
+
+        assert_eq!(commitment1, commitment2, "Commitments must be deterministic and equal");
+    }
+
+    #[test]
+    fn test_partial_commitment() {
+        let pedersen = Pedersen::<G1Projective>::new(5);
+
+        let mut rng = test_rng();
+        let scalars: Vec<Fr> = (0..3).map(|_| Fr::rand(&mut rng)).collect();
+
+        let commitment = pedersen.commit(&scalars);
+
+        // Check that the result is a valid group element (non-identity in general)
+        assert!(!commitment.is_zero(), "Commitment should not be zero for random scalars");
+    }
+
+    #[test]
+    #[should_panic(expected = "Too many scalars for the number of generators")]
+    fn test_commitment_too_many_scalars() {
+        let pedersen = Pedersen::<G1Projective>::new(3);
+
+        let mut rng = test_rng();
+        let scalars: Vec<Fr> = (0..4).map(|_| Fr::rand(&mut rng)).collect();
+
+        // This should panic because there are more scalars than generators
+        let _ = pedersen.commit(&scalars);
+    }
+
+    #[test]
+    fn test_deterministic_generators() {
+        let pedersen1 = Pedersen::<G1Projective>::new(4);
+        let pedersen2 = Pedersen::<G1Projective>::new(4);
+
+        assert_eq!(
+            pedersen1.generators, pedersen2.generators,
+            "Generators with the same label should be equal"
+        );
+    }
+
+    #[test]
+    fn test_commit_sparse_matches_dense() {
+        let pedersen = Pedersen::<G1Projective>::new(10);
+
+        let mut rng = test_rng();
+
+        // Build a sparse vector: (index, value)
+        let terms = vec![
+            (2, Fr::rand(&mut rng)),
+            (5, Fr::rand(&mut rng)),
+            (7, Fr::rand(&mut rng)),
+        ];
+
+        // Build the equivalent dense scalar vector
+        let mut scalars = vec![Fr::from(0); 10];
+        for (i, v) in &terms {
+            scalars[*i] = *v;
+        }
+
+        // Compare sparse vs dense
+        let dense_commitment = pedersen.commit(&scalars);
+        let sparse_commitment = pedersen.commit_sparse(&terms);
+
+        assert_eq!(
+            dense_commitment, sparse_commitment,
+            "Sparse and dense commitments should be equal"
+        );
+    }
+}
