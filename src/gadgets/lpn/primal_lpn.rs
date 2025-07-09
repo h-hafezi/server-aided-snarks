@@ -1,12 +1,11 @@
-/*use ark_ff::PrimeField;
+use ark_ff::PrimeField;
 use ark_std::rand::Rng;
 use crate::gadgets::matrix::Matrix;
-use crate::gadgets::matrix::sparse::SparseMatrix;
 use crate::gadgets::matrix::t_sparse::TSparseMatrix;
 
 #[derive(Debug, Clone)]
 pub struct PrimalLPNIndex<F: PrimeField> {
-    pub t_matrix: SparseMatrix<F>,
+    pub t_matrix: TSparseMatrix<F>,
     pub rows: usize,
     pub cols: usize,
     pub t: usize,
@@ -36,7 +35,7 @@ impl<F: PrimeField> PrimalLPNInstance<F> {
             .map(|_| if rng.gen_bool(0.5) { F::ONE } else { F::ZERO })
             .collect();
 
-        let ts = index.t_matrix.right_multiply_vec(&secret);
+        let ts = index.t_matrix.matrix().right_multiply_vec(&secret);
 
         // lpn_vector = ts + noise (element-wise addition)
         let lpn_vector: Vec<F> = ts
@@ -65,7 +64,7 @@ mod tests {
 
         let index = PrimalLPNIndex::<Fr>::new(&mut rng, rows, cols, t);
         println!("T = ");
-        index.t_matrix.print();
+        index.t_matrix.matrix().print();
 
         let instance = PrimalLPNInstance::new(&mut rng, index);
         println!("Secret s = {:?}", instance.secret);
@@ -73,4 +72,4 @@ mod tests {
         println!("LPN vector (T*s + e) = {:?}", instance.lpn_vector);
     }
 }
- */
+

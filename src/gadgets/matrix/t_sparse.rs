@@ -1,18 +1,20 @@
 use std::collections::HashSet;
 use ark_ff::PrimeField;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::Rng;
 use crate::gadgets::matrix::sparse::SparseMatrix;
 
+#[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct TSparseMatrix<F: PrimeField> {
     pub t: usize,
     pub matrix: SparseMatrix<F>,
 }
 
-/// Generates a random matrix with `rows` rows and `cols` columns,
-/// where each row has exactly `t` non-zero uniformly random entries.
-///
-/// Panics if `t > cols` because it's impossible to select `t` distinct columns.
 impl<F: PrimeField> TSparseMatrix<F> {
+    /// Generates a random matrix with `rows` rows and `cols` columns,
+    /// where each row has exactly `t` non-zero uniformly random entries.
+    ///
+    /// Panics if `t > cols` because it's impossible to select `t` distinct columns.
     pub fn new<R: Rng>(
         rng: &mut R,
         rows: usize,
