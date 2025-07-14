@@ -2,6 +2,7 @@ use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use rand::thread_rng;
 use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 use crate::gadgets::lpn::primal_lpn::{PrimalLPNIndex, PrimalLPNInstance};
 use crate::gadgets::matrix::dense::DenseMatrix;
 use crate::gadgets::matrix::Matrix;

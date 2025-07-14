@@ -4,6 +4,7 @@ pub mod sparse;
 
 pub mod dense;
 pub mod t_sparse;
+pub mod bidiagonal;
 
 pub trait Matrix<F: PrimeField>: Send + Sync {
     type Input<'a>: ?Sized where F: 'a;
