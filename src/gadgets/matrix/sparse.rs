@@ -4,7 +4,6 @@ use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use crate::gadgets::matrix::Matrix;
-use crate::gadgets::sparse_vec::sparse_vec::SparseVector;
 
 pub type MatrixRef<'a, F> = &'a [Vec<(F, usize)>];
 
@@ -293,7 +292,6 @@ mod tests {
     use ark_ff::Zero;
     use ark_std::UniformRand;
     use rand::thread_rng;
-    use std::time::Instant;
     use crate::gadgets::matrix::dense::DenseMatrix;
     use crate::gadgets::matrix::t_sparse::TSparseMatrix;
     use super::*;

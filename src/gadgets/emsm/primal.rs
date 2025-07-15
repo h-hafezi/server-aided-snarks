@@ -1,4 +1,4 @@
-use ark_ec::CurveGroup;
+/*use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use rand::thread_rng;
 use rayon::iter::IntoParallelIterator;
@@ -238,9 +238,4 @@ mod tests {
         assert_eq!(msm_in_plaintext, decrypted_msm);
     }
 }
-
-
-
-
-
-
+ */

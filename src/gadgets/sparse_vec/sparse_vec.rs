@@ -1,6 +1,5 @@
 use ark_ff::PrimeField;
-use rand::{seq::IteratorRandom, Rng};
-use crate::gadgets::sparse_vec::constant::{get_t, Error};
+use rand::Rng;
 
 #[derive(Debug, Clone)]
 pub struct SparseVector<F: PrimeField> {
@@ -27,29 +26,23 @@ impl<F: PrimeField> SparseVector<F> {
     }
 
     // throws error if n is not within [2^{10}, 2^{20}]
-    pub fn error_vec<R: Rng + ?Sized>(size: usize, rng: &mut R) -> Result<Self, Error> {
-        let t = get_t(size)?;
+    pub fn error_vec<R: Rng + ?Sized>(size: usize, t: usize, rng: &mut R) -> Self {
+        let chunk_size = size / t;
+        let mut entries = Vec::with_capacity(t);
 
-        // Select `t` unique random indices in range [0, n)
-        let indices: Vec<usize> = (0..size)
-            .choose_multiple(rng, t);
+        for i in 0..t {
+            let offset = rng.gen_range(0..chunk_size);
+            let index = i * chunk_size + offset;
 
-        // For each index, assign a random non-zero field element
-        let entries: Vec<(usize, F)> = indices
-            .into_iter()
-            .map(|i| {
-                let mut val = F::rand(rng);
-                while val.is_zero() {
-                    val = F::rand(rng); // ensure non-zero
-                }
-                (i, val)
-            })
-            .collect();
+            // No need to enforce non-zero; probability of zero is negligible
+            let val = F::rand(rng);
+            entries.push((index, val));
+        }
 
-        Ok(Self {
+        Self {
             size,
             entries,
-        })
+        }
     }
 }
 
@@ -95,22 +88,19 @@ mod tests {
     #[test]
     fn test_valid_error_vec_sizes() {
         let mut rng = test_rng();
+        let t = 400;
 
         let sizes = [1 << 10, 1 << 12, 1 << 14, 1 << 16, 1 << 18, 1 << 20];
         for &size in &sizes {
-            let result = SparseVector::<Fr>::error_vec(size, &mut rng);
-            assert!(result.is_ok(), "Expected Ok for size = {}", size);
-
-            let sparse = result.unwrap();
-            let expected_t = get_t(size).unwrap();
+            let sparse = SparseVector::<Fr>::error_vec(size,t, &mut rng);
 
             // Check correct size and number of non-zeros
             assert_eq!(sparse.size, size);
-            assert_eq!(sparse.entries.len(), expected_t, "Wrong number of non-zero entries");
+            assert_eq!(sparse.entries.len(), t, "Wrong number of non-zero entries");
 
             // Check for unique indices
             let indices: HashSet<_> = sparse.entries.iter().map(|(i, _)| *i).collect();
-            assert_eq!(indices.len(), expected_t, "Duplicate indices found");
+            assert_eq!(indices.len(), t, "Duplicate indices found");
 
             // Check for non-zero field values
             assert!(
@@ -121,26 +111,12 @@ mod tests {
     }
 
     #[test]
-    fn test_error_vec_invalid_sizes() {
-        let mut rng = test_rng();
-
-        let invalid_sizes = [0, 1 << 9, (1 << 20) + 1, usize::MAX];
-        for &size in &invalid_sizes {
-            let result = SparseVector::<Fr>::error_vec(size, &mut rng);
-            assert!(
-                matches!(result, Err(Error::NOutOfRange)),
-                "Expected NOutOfRange for size = {}, got {:?}", size, result
-            );
-        }
-    }
-
-    #[test]
     fn test_randomness_and_distribution() {
         let mut rng = test_rng();
-        let size = 1 << 12;
+        let (size, t) = (1 << 12, 400usize);
 
-        let vec1 = SparseVector::<Fr>::error_vec(size, &mut rng).unwrap();
-        let vec2 = SparseVector::<Fr>::error_vec(size, &mut rng).unwrap();
+        let vec1 = SparseVector::<Fr>::error_vec(size, t, &mut rng);
+        let vec2 = SparseVector::<Fr>::error_vec(size, t, &mut rng);
 
         // It’s unlikely for two independently sampled sparse vectors to be identical
         assert_ne!(vec1.entries, vec2.entries, "Sparse vectors should differ due to randomness");
