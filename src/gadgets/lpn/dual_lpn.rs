@@ -1,5 +1,7 @@
+use std::time::Instant;
 use ark_ff::PrimeField;
 use rand::Rng;
+use rand::seq::index::sample;
 use crate::gadgets::matrix::bidiagonal::UnitLowerBidiagonalMatrix;
 use crate::gadgets::matrix::Matrix;
 use crate::gadgets::matrix::t_sparse::TSparseMatrix;
@@ -49,27 +51,43 @@ pub struct DualLPNInstance<F: PrimeField> {
 }
 
 impl<F: PrimeField> DualLPNInstance<F> {
-    pub fn new<R: Rng>(rng: &mut R, index: DualLPNIndex<F>) -> Self {
-        // Noise vector as field elements 0 or 1
-        let noise: Vec<F> = (0..index.N)
-            .map(|_| if rng.gen_bool(0.5) { F::ONE } else { F::ZERO })
-            .collect();
+    pub fn new<R: Rng>(rng: &mut R, index: DualLPNIndex<F>, non_zero_count: usize) -> Self {
+        // Start timer before sampling
+        let start_sampling = Instant::now();
 
-        let noise_1: Vec<F> = noise[0..index.n].to_vec();
-        let noise_2: Vec<F> = noise[index.n..index.N].to_vec();
+        // Sample distinct indices for ones in noise vector
+        let ones_indices = sample(rng, index.N, non_zero_count).into_vec();
 
-        let h1_e = index.h1_matrix.matrix().right_multiply_vec(noise_2.as_slice());
+        let sampling_time = start_sampling.elapsed();
+        println!("Sampling time: {:?}", sampling_time); // Should be very fast
 
-        // asserting h1_e is well-foramtted
+        // Partition sampled indices into noise_1 and noise_2 sets
+        let (noise_1_nonzero_indices, noise_2_nonzero_indices): (Vec<_>, Vec<_>) = ones_indices
+            .into_iter()
+            .partition(|&idx| idx < index.n);
+
+        // Build noise vector
+        let mut noise = vec![F::ZERO; index.N];
+        for &idx in noise_1_nonzero_indices.iter().chain(noise_2_nonzero_indices.iter()) {
+            noise[idx] = F::ONE;
+        }
+
+        let noise_1 = &noise[0..index.n];
+        let noise_2 = &noise[index.n..index.N];
+
+        // Compute h1_e = H1 * noise_2
+        let h1_e = index.h1_matrix.matrix().right_multiply_vec(noise_2);
+
         assert_eq!(h1_e.len(), index.h2_matrix.cols() - 1);
 
-        // compute H_2^{-1} (H_1.e)
+        // Compute z = H2^{-1} * h1_e
         let z = index.h2_matrix.right_multiply_inverse_vec(h1_e.as_slice());
 
-        let lpn_vector: Vec<F> = z.iter()
-            .zip(noise_1.iter())
-            .map(|(a, b)| *a + *b)
-            .collect();
+        // Efficiently compute lpn_vector = z + noise_1 using only noise_1_nonzero_indices
+        let mut lpn_vector = z.clone();
+        for &i in &noise_1_nonzero_indices {
+            lpn_vector[i] += noise_1[i];
+        }
 
         DualLPNInstance {
             index,

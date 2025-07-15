@@ -1,5 +1,6 @@
 use ark_ec::{CurveGroup, ScalarMul, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use crate::gadgets::sparse_vec::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
 pub struct Pedersen<G: CurveGroup> {
@@ -40,10 +41,9 @@ where
         VariableBaseMSM::msm_unchecked(&self.generators[..scalars.len()], scalars)
     }
 
-    /// Sparse commitment: terms are (index, scalar) pairs.
-    /// Much faster when the vector is sparse compared to full MSM.
-    pub fn commit_sparse(&self, terms: &[(usize, G::ScalarField)]) -> G {
-        for (i, _) in terms.iter() {
+    /// Sparse commitment: computes commitment using only non-zero entries of the sparse vector.
+    pub fn commit_sparse(&self, vector: &SparseVector<G::ScalarField>) -> G {
+        for (i, _) in vector.entries.iter() {
             assert!(
                 *i < self.generators.len(),
                 "Index {} out of bounds for number of generators {}",
@@ -52,8 +52,10 @@ where
             );
         }
 
-        let bases: Vec<G::MulBase> = terms.iter().map(|(i, _)| self.generators[*i]).collect();
-        let scalars: Vec<G::ScalarField> = terms.iter().map(|(_, s)| *s).collect();
+        assert_eq!(vector.size, self.generators.len());
+
+        let bases: Vec<G::Affine> = vector.entries.iter().map(|(i, _)| self.generators[*i]).collect();
+        let scalars: Vec<G::ScalarField> = vector.entries.iter().map(|(_, s)| *s).collect();
 
         VariableBaseMSM::msm_unchecked(&bases, &scalars)
     }
@@ -133,15 +135,14 @@ mod tests {
             (7, Fr::rand(&mut rng)),
         ];
 
-        // Build the equivalent dense scalar vector
-        let mut scalars = vec![Fr::from(0); 10];
-        for (i, v) in &terms {
-            scalars[*i] = *v;
-        }
+        let sparse = SparseVector::new(10, terms.clone());
 
-        // Compare sparse vs dense
-        let dense_commitment = pedersen.commit(&scalars);
-        let sparse_commitment = pedersen.commit_sparse(&terms);
+        // Build the dense scalar vector
+        let dense= sparse.into_dense();
+
+        // Commit both ways
+        let dense_commitment = pedersen.commit(&dense);
+        let sparse_commitment = pedersen.commit_sparse(&sparse);
 
         assert_eq!(
             dense_commitment, sparse_commitment,
