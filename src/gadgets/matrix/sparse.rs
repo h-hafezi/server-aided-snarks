@@ -287,34 +287,6 @@ impl<'a, F: PrimeField> Iterator for Iter<'a, F> {
     }
 }
 
-impl<F: PrimeField> SparseMatrix<F> {
-    /// Right multiplication: M * v_sparse -> dense vector
-    pub fn right_multiply_sparse_vec(&self, vec: &SparseVector<F>) -> Vec<F> {
-        assert_eq!(vec.size, self.cols);
-
-        let mut result = vec![F::zero(); self.rows()];
-
-        for (col, val) in &vec.entries {
-            let col = *col;
-            let val = *val;
-
-            for row in 0..self.rows() {
-                let start = self.indptr[row];
-                let end = self.indptr[row + 1];
-
-                // Binary search since `self.indices[start..end]` is sorted
-                if let Ok(rel_idx) = self.indices[start..end].binary_search(&col) {
-                    let idx = start + rel_idx;
-                    result[row] += self.data[idx] * val;
-                }
-            }
-        }
-
-        result
-    }
-}
-
-
 #[cfg(test)]
 mod tests {
     use ark_bls12_381::Fr;
@@ -451,36 +423,5 @@ mod tests {
             t_u, dense_t_u,
             "Sparse and dense give different multiplication result"
         );
-    }
-
-    #[test]
-    fn sparse_vec_multiplication() {
-        let mut rng = thread_rng();
-
-        // Parameters
-        let rows = 1024 * 1024;
-        let cols = 1024 * 1024;
-        let t = 10; // number of non-zero entries per row
-
-        println!("▶ Starting test with rows = {}, cols = {}, t = {}", rows, cols, t);
-
-        // Generate the t-sparse matrix
-        let sparse_matrix = TSparseMatrix::<Fr>::new(&mut rng, rows, cols, t);
-
-        // Generate sparse vector
-        let sparse_vec = SparseVector::<Fr>::error_vec(1024 * 1024, &mut rng).unwrap();
-
-        // Right multiplication with sparse vector
-        let start = Instant::now();
-        let res = sparse_matrix.matrix.right_multiply_sparse_vec(&sparse_vec);
-        println!("⏱ Right multiply with sparse vector took: {:.2?}", start.elapsed());
-
-        // Convert to dense and multiply again
-        let start = Instant::now();
-        let expected = sparse_matrix.matrix.right_multiply_vec(sparse_vec.into_dense().as_slice());
-        println!("⏱ Right multiply with dense vector took: {:.2?}", start.elapsed());
-
-        // Check equality
-        assert_eq!(expected, res);
     }
 }
