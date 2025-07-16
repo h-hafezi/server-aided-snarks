@@ -25,7 +25,6 @@ impl<F: PrimeField> SparseVector<F> {
         dense
     }
 
-    // throws error if n is not within [2^{10}, 2^{20}]
     pub fn error_vec<R: Rng + ?Sized>(size: usize, t: usize, rng: &mut R) -> Self {
         let chunk_size = size / t;
         let mut entries = Vec::with_capacity(t);

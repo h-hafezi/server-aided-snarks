@@ -1,2 +1,1 @@
-pub mod primal;
-mod dual;
+pub mod dual;

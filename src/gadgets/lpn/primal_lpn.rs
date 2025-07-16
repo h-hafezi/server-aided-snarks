@@ -45,6 +45,7 @@ impl<F: PrimeField> PrimalLPNInstance<F> {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
     use super::*;
     use ark_bls12_381::Fr;
     use ark_std::rand::{SeedableRng, rngs::StdRng};
@@ -53,19 +54,22 @@ mod tests {
     fn test_primal_lpn_modular() {
         let mut rng = StdRng::seed_from_u64(42);
 
-        let rows = 5;
-        let cols = 8;
-        let t = 1;
+        let rows = 1024 * 1024;
+        let cols = 8000;
+        let t = 10;
         
         let index = PrimalLPNIndex::<Fr>::new(&mut rng, rows, cols, t);
-        println!("T = ");
-        index.t_matrix.matrix().print();
 
+        // Time error generation
+        let start_error = Instant::now();
         let error = SparseVector::error_vec(rows, t, &mut rng);
+        let duration_error = start_error.elapsed();
+        println!("Time to generate error vector: {:?}", duration_error);
 
+        // Time instance creation
+        let start_instance = Instant::now();
         let instance = PrimalLPNInstance::new(&mut rng, index, error);
-        println!("Secret s = {:?}", instance.secret);
-        println!("Noise e = {:?}", instance.noise);
-        println!("LPN vector (T*s + e) = {:?}", instance.lpn_vector);
+        let duration_instance = start_instance.elapsed();
+        println!("Time to generate LPN instance: {:?}", duration_instance);
     }
 }

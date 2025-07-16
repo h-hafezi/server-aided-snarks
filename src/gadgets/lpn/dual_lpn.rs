@@ -92,7 +92,7 @@ mod test{
         let rng = &mut thread_rng();
         let (t, n, N) = (10, 1024 * 1024, 4 * 1024 * 1024);
         let index = DualLPNIndex::<F>::new(rng, n, N, t);
-        let error = SparseVector::error_vec(N,t, rng);
+        let error = SparseVector::error_vec(N, t, rng);
         let _ = DualLPNInstance::new(index, error);
     }
 
