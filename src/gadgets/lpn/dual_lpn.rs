@@ -42,13 +42,12 @@ impl<F: PrimeField> DualLPNIndex<F> {
 
 #[derive(Debug, Clone)]
 pub struct DualLPNInstance<F: PrimeField> {
-    pub index: DualLPNIndex<F>,
     pub noise: SparseVector<F>, // vector of noise of size N
     pub lpn_vector: Vec<F>, // [I, H_2^{-1} H_1] * noise
 }
 
 impl<F: PrimeField> DualLPNInstance<F> {
-    pub fn new(index: DualLPNIndex<F>, noise: SparseVector<F>) -> Self {
+    pub fn new(index: &DualLPNIndex<F>, noise: SparseVector<F>) -> Self {
         // ensure the noise has the right format
         assert_eq!(index.N, noise.size);
 
@@ -71,7 +70,6 @@ impl<F: PrimeField> DualLPNInstance<F> {
             .collect();
 
         DualLPNInstance {
-            index,
             noise,
             lpn_vector,
         }
@@ -93,7 +91,7 @@ mod test{
         let (t, n, N) = (10, 1024 * 1024, 4 * 1024 * 1024);
         let index = DualLPNIndex::<F>::new(rng, n, N, t);
         let error = SparseVector::error_vec(N, t, rng);
-        let _ = DualLPNInstance::new(index, error);
+        let _ = DualLPNInstance::new(&index, error);
     }
 
     #[test]
@@ -118,8 +116,8 @@ mod test{
             // Compute H2 * T[:,i]
             let h2_times_tcol = index.h2_matrix.right_multiply_vec(&t_col);
 
-            index.h2_matrix.print();
-            println!("t_col: {:?}", t_col);
+            // index.h2_matrix.print();
+            // println!("t_col: {:?}", t_col);
 
             // Should equal H1[:,i-n]
             let h1_col = h1_dense.get_column(i - n);

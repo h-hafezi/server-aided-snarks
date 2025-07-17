@@ -25,11 +25,11 @@ impl<F: PrimeField> SparseVector<F> {
         dense
     }
 
-    pub fn error_vec<R: Rng + ?Sized>(size: usize, t: usize, rng: &mut R) -> Self {
-        let chunk_size = size / t;
-        let mut entries = Vec::with_capacity(t);
+    pub fn error_vec<R: Rng + ?Sized>(size: usize, non_zeros: usize, rng: &mut R) -> Self {
+        let chunk_size = size / non_zeros;
+        let mut entries = Vec::with_capacity(non_zeros);
 
-        for i in 0..t {
+        for i in 0..non_zeros {
             let offset = rng.gen_range(0..chunk_size);
             let index = i * chunk_size + offset;
 
@@ -87,19 +87,19 @@ mod tests {
     #[test]
     fn test_valid_error_vec_sizes() {
         let mut rng = test_rng();
-        let t = 400;
+        let non_zeros = 400;
 
         let sizes = [1 << 10, 1 << 12, 1 << 14, 1 << 16, 1 << 18, 1 << 20];
         for &size in &sizes {
-            let sparse = SparseVector::<Fr>::error_vec(size,t, &mut rng);
+            let sparse = SparseVector::<Fr>::error_vec(size, non_zeros, &mut rng);
 
             // Check correct size and number of non-zeros
             assert_eq!(sparse.size, size);
-            assert_eq!(sparse.entries.len(), t, "Wrong number of non-zero entries");
+            assert_eq!(sparse.entries.len(), non_zeros, "Wrong number of non-zero entries");
 
             // Check for unique indices
             let indices: HashSet<_> = sparse.entries.iter().map(|(i, _)| *i).collect();
-            assert_eq!(indices.len(), t, "Duplicate indices found");
+            assert_eq!(indices.len(), non_zeros, "Duplicate indices found");
 
             // Check for non-zero field values
             assert!(
@@ -112,10 +112,10 @@ mod tests {
     #[test]
     fn test_randomness_and_distribution() {
         let mut rng = test_rng();
-        let (size, t) = (1 << 12, 400usize);
+        let (size, non_zeros) = (1 << 12, 400usize);
 
-        let vec1 = SparseVector::<Fr>::error_vec(size, t, &mut rng);
-        let vec2 = SparseVector::<Fr>::error_vec(size, t, &mut rng);
+        let vec1 = SparseVector::<Fr>::error_vec(size, non_zeros, &mut rng);
+        let vec2 = SparseVector::<Fr>::error_vec(size, non_zeros, &mut rng);
 
         // It’s unlikely for two independently sampled sparse vectors to be identical
         assert_ne!(vec1.entries, vec2.entries, "Sparse vectors should differ due to randomness");

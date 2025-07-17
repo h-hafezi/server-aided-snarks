@@ -1,7 +1,7 @@
 use criterion::{Criterion, BenchmarkId, criterion_group, criterion_main};
 use rand::thread_rng;
 
-use ark_bls12_381::Fr as F;
+use ark_bn254::Fr as F;
 use server_aided_SNARK::gadgets::lpn::dual_lpn::{DualLPNIndex, DualLPNInstance};
 use server_aided_SNARK::gadgets::sparse_vec::sparse_vec::SparseVector;
 
@@ -34,7 +34,7 @@ fn bench_dual_lpn(c: &mut Criterion) {
                     let rng = &mut thread_rng();
                     let index = DualLPNIndex::<F>::new(rng, n, N, t);
                     let error = SparseVector::error_vec(N, d, rng);
-                    let _instance = DualLPNInstance::new(index, error);
+                    let _instance = DualLPNInstance::new(&index, error);
                 });
             });
         }
