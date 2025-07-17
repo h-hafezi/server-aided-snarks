@@ -2,7 +2,7 @@ use criterion::{Criterion, BenchmarkId, criterion_group, criterion_main};
 use ark_ff::UniformRand;
 use ark_bls12_381::{Fr as F, G1Projective};
 use ark_std::test_rng;
-use server_aided_SNARK::gadgets::emsm::dual::{ClientState, PublicParams};
+use server_aided_SNARK::gadgets::emsm::dual::{DualEmsmInstance, DualEmsmPublicParams};
 use server_aided_SNARK::gadgets::matrix::dense::DenseMatrix;
 
 fn bench_msm_protocol(c: &mut Criterion) {
@@ -34,49 +34,49 @@ fn bench_msm_protocol(c: &mut Criterion) {
         let server_new_id = BenchmarkId::new(format!("server_state_new n=2^{}", log_n), "");
         group.bench_with_input(server_new_id, &n, |b, &_n| {
             b.iter(|| {
-                PublicParams::<F, G1Projective>::new(n, n, u_matrix.clone())
+                DualEmsmPublicParams::<F, G1Projective>::new(n, n, u_matrix.clone())
             });
         });
 
-        let server_state = PublicParams::<F, G1Projective>::new(n, n, u_matrix.clone());
+        let pp = DualEmsmPublicParams::<F, G1Projective>::new(n, n, u_matrix.clone());
 
         // benchmark ClientState::new
         let client_new_id = BenchmarkId::new(format!("client_state_new n=2^{}", log_n), "");
         group.bench_with_input(client_new_id, &n, |b, &_n| {
             b.iter(|| {
-                ClientState::<F>::new(&server_state, non_zeros)
+                DualEmsmInstance::<F>::new(&pp, non_zeros)
             });
         });
 
-        let client_state = ClientState::<F>::new(&server_state, non_zeros);
+        let emsm_instance = DualEmsmInstance::<F>::new(&pp, non_zeros);
 
         // benchmark client_phase1
         let client_phase1_id = BenchmarkId::new(format!("client_phase1 n=2^{}", log_n), "");
         group.bench_with_input(client_phase1_id, &n, |b, &_n| {
             b.iter(|| {
-                client_state.client_phase1(&server_state, witness.as_slice())
+                emsm_instance.mask_witness(&pp, witness.as_slice())
             });
         });
 
-        let encrypted_witness = client_state.client_phase1(&server_state, witness.as_slice());
+        let encrypted_witness = emsm_instance.mask_witness(&pp, witness.as_slice());
 
-        let preprocessed_commitments = server_state.preprocess();
+        let preprocessed_commitments = pp.preprocess();
 
         // benchmark server_compute
         let server_compute_id = BenchmarkId::new(format!("server_compute n=2^{}", log_n), "");
         group.bench_with_input(server_compute_id, &n, |b, &_n| {
             b.iter(|| {
-                server_state.server_compute(encrypted_witness.clone())
+                pp.server_computation(encrypted_witness.clone())
             });
         });
 
-        let encrypted_msm = server_state.server_compute(encrypted_witness.clone());
+        let encrypted_msm = pp.server_computation(encrypted_witness.clone());
 
         // benchmark client_phase2
         let client_phase2_id = BenchmarkId::new(format!("client_phase2 n=2^{}", log_n), "");
         group.bench_with_input(client_phase2_id, &n, |b, &_n| {
             b.iter(|| {
-                client_state.client_phase2(&preprocessed_commitments, encrypted_msm.clone())
+                emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone())
             });
         });
 
@@ -84,7 +84,7 @@ fn bench_msm_protocol(c: &mut Criterion) {
         let compute_plaintext_id = BenchmarkId::new(format!("compute_msm_plaintext n=2^{}", log_n), "");
         group.bench_with_input(compute_plaintext_id, &n, |b, &_n| {
             b.iter(|| {
-                client_state.compute_msm_in_plaintext(&server_state, witness.as_slice())
+                emsm_instance.compute_msm_in_plaintext(&pp, witness.as_slice())
             });
         });
     }
