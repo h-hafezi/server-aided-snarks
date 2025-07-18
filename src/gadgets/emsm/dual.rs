@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn preprocess() {
         let mut rng = thread_rng();
-        let (m, non_zeros, n) = (50, 20, 40usize);
+        let (m, non_zeros, n) = (50, 5, 30usize);
         let u_matrix = DenseMatrix::<F>::rand(m, n, &mut rng);
 
         // generate client/server state

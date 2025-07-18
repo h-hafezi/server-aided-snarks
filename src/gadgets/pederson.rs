@@ -1,8 +1,8 @@
 use ark_ec::{CurveGroup, ScalarMul, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use rayon::iter::IntoParallelIterator;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use crate::gadgets::sparse_vec::sparse_vec::SparseVector;
-use rayon::iter::ParallelIterator;
 
 #[derive(Debug, Clone)]
 pub struct Pedersen<G: CurveGroup> {
@@ -16,10 +16,12 @@ where
     /// Create a new Pedersen commitment instance with `n` generators.
     /// The generators are deterministically derived from the label.
     pub fn new(n: usize) -> Self {
-        // Sample random group elements
+        // Use a fixed seed for determinism
+        let mut rng = ChaCha20Rng::from_seed([0u8; 32]); // Or derive from a label if needed
+
+        // Sample deterministic group elements
         let gens: Vec<G> = (0..n)
-            .into_par_iter()
-            .map(|_| G::rand(&mut rand::thread_rng()))
+            .map(|_| G::rand(&mut rng))
             .collect();
 
         let mul_bases = ScalarMul::batch_convert_to_mul_base(&gens);
