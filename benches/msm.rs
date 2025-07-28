@@ -3,7 +3,7 @@ use ark_ff::{UniformRand};
 use ark_bn254::{Fr, G1Projective};
 use ark_std::test_rng;
 
-use server_aided_SNARK::gadgets::pederson::Pedersen;
+use server_aided_SNARK::emsm::pederson::Pedersen;
 
 fn bench_pedersen(c: &mut Criterion) {
     let mut group = c.benchmark_group("pedersen_commitment");

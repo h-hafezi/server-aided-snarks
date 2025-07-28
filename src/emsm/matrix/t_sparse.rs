@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::Rng;
-use crate::gadgets::matrix::sparse::SparseMatrix;
+use crate::emsm::matrix::sparse::SparseMatrix;
 
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct TSparseMatrix<F: PrimeField> {
@@ -74,8 +74,8 @@ mod tests {
     use ark_bls12_381::Fr;
     use rand::prelude::StdRng;
     use rand::SeedableRng;
-    use crate::gadgets::matrix::Matrix;
-    use crate::gadgets::matrix::t_sparse::TSparseMatrix;
+    use crate::emsm::matrix::Matrix;
+    use crate::emsm::matrix::t_sparse::TSparseMatrix;
 
     #[test]
     fn test_t_sparse_row_matrix_and_print() {

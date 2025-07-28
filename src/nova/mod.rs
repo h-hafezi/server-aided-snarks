@@ -6,6 +6,4 @@ pub mod pederson;
 
 pub mod poseidon;
 
-pub mod transcript;
-
 pub mod gadgets;

@@ -10,7 +10,6 @@ use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
 
-
 use crate::nova::commitment::CommitmentScheme;
 use crate::nova::gadgets::sparse::{MatrixRef, SparseMatrix};
 pub use ark_relations::r1cs::Matrix;

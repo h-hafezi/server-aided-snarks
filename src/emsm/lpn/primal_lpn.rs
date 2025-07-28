@@ -1,8 +1,8 @@
 use ark_ff::PrimeField;
 use rand::Rng;
-use crate::gadgets::matrix::Matrix;
-use crate::gadgets::matrix::t_sparse::TSparseMatrix;
-use crate::gadgets::sparse_vec::sparse_vec::SparseVector;
+use crate::emsm::matrix::Matrix;
+use crate::emsm::matrix::t_sparse::TSparseMatrix;
+use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
 pub struct PrimalLPNIndex<F: PrimeField> {

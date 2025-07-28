@@ -1,9 +1,9 @@
 use ark_ff::PrimeField;
 use rand::Rng;
-use crate::gadgets::matrix::bidiagonal::UnitLowerBidiagonalMatrix;
-use crate::gadgets::matrix::Matrix;
-use crate::gadgets::matrix::t_sparse::TSparseMatrix;
-use crate::gadgets::sparse_vec::sparse_vec::SparseVector;
+use crate::emsm::matrix::bidiagonal::UnitLowerBidiagonalMatrix;
+use crate::emsm::matrix::Matrix;
+use crate::emsm::matrix::t_sparse::TSparseMatrix;
+use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
 pub struct DualLPNIndex<F: PrimeField> {
@@ -81,9 +81,9 @@ impl<F: PrimeField> DualLPNInstance<F> {
 mod test{
     use rand::thread_rng;
     use ark_bls12_381::Fr as F;
-    use crate::gadgets::matrix::Matrix;
-    use crate::gadgets::sparse_vec::sparse_vec::SparseVector;
-    use crate::gadgets::lpn::dual_lpn::{DualLPNIndex, DualLPNInstance};
+    use crate::emsm::matrix::Matrix;
+    use crate::emsm::sparse_vec::sparse_vec::SparseVector;
+    use crate::emsm::lpn::dual_lpn::{DualLPNIndex, DualLPNInstance};
 
     #[test]
     fn test_dual_lpn() {

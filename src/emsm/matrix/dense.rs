@@ -2,7 +2,7 @@ use ark_ff::PrimeField;
 use ark_std::{vec, vec::Vec};
 use rand::Rng;
 use rayon::prelude::*;
-use crate::gadgets::matrix::Matrix;
+use crate::emsm::matrix::Matrix;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DenseMatrix<F: PrimeField> {

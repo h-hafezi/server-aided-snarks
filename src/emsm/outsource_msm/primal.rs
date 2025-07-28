@@ -1,13 +1,13 @@
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use rand::thread_rng;
-use crate::gadgets::lpn::primal_lpn::{PrimalLPNIndex, PrimalLPNInstance};
+use crate::emsm::lpn::primal_lpn::{PrimalLPNIndex, PrimalLPNInstance};
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
-use crate::gadgets::matrix::dense::DenseMatrix;
-use crate::gadgets::matrix::Matrix;
-use crate::gadgets::pederson::Pedersen;
-use crate::gadgets::sparse_vec::sparse_vec::SparseVector;
+use crate::emsm::matrix::dense::DenseMatrix;
+use crate::emsm::matrix::Matrix;
+use crate::emsm::pederson::Pedersen;
+use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
 pub struct PrimalEmsmPublicParams<F, G>
@@ -163,8 +163,8 @@ mod tests {
     use rand::thread_rng;
     use ark_bls12_381::{Fr as F, G1Projective};
     use ark_std::UniformRand;
-    use crate::gadgets::emsm::primal::{PrimalEmsmInstance, PrimalEmsmPublicParams};
-    use crate::gadgets::matrix::dense::DenseMatrix;
+    use crate::emsm::outsource_msm::primal::{PrimalEmsmInstance, PrimalEmsmPublicParams};
+    use crate::emsm::matrix::dense::DenseMatrix;
 
     #[test]
     fn preprocess() {

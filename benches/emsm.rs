@@ -2,8 +2,8 @@ use criterion::{Criterion, BenchmarkId, criterion_group, criterion_main};
 use ark_ff::UniformRand;
 use ark_bls12_381::{Fr as F, G1Projective};
 use ark_std::test_rng;
-use server_aided_SNARK::gadgets::emsm::dual::{DualEmsmInstance, DualEmsmPublicParams};
-use server_aided_SNARK::gadgets::matrix::dense::DenseMatrix;
+use server_aided_SNARK::emsm::outsource_msm::dual::{DualEmsmInstance, DualEmsmPublicParams};
+use server_aided_SNARK::emsm::matrix::dense::DenseMatrix;
 
 fn bench_msm_protocol(c: &mut Criterion) {
     let mut group = c.benchmark_group("msm_protocol");

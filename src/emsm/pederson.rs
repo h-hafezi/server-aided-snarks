@@ -2,7 +2,7 @@ use ark_ec::{CurveGroup, ScalarMul, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use crate::gadgets::sparse_vec::sparse_vec::SparseVector;
+use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
 pub struct Pedersen<G: CurveGroup> {

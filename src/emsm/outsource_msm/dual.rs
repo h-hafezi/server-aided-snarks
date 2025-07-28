@@ -3,11 +3,11 @@ use ark_ff::PrimeField;
 use rand::thread_rng;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
-use crate::gadgets::lpn::dual_lpn::{DualLPNIndex, DualLPNInstance};
-use crate::gadgets::matrix::dense::DenseMatrix;
-use crate::gadgets::matrix::Matrix;
-use crate::gadgets::pederson::Pedersen;
-use crate::gadgets::sparse_vec::sparse_vec::SparseVector;
+use crate::emsm::lpn::dual_lpn::{DualLPNIndex, DualLPNInstance};
+use crate::emsm::matrix::dense::DenseMatrix;
+use crate::emsm::matrix::Matrix;
+use crate::emsm::pederson::Pedersen;
+use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
 pub struct DualEmsmPublicParams<F, G>
@@ -157,8 +157,8 @@ mod tests {
     use rand::thread_rng;
     use ark_bls12_381::{Fr as F, G1Projective};
     use ark_std::UniformRand;
-    use crate::gadgets::emsm::dual::{DualEmsmInstance, DualEmsmPublicParams};
-    use crate::gadgets::matrix::dense::DenseMatrix;
+    use crate::emsm::outsource_msm::dual::{DualEmsmInstance, DualEmsmPublicParams};
+    use crate::emsm::matrix::dense::DenseMatrix;
 
     #[test]
     fn preprocess() {

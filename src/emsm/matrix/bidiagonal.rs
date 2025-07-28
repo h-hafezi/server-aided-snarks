@@ -1,5 +1,5 @@
-use crate::gadgets::matrix::dense::DenseMatrix;
-use crate::gadgets::matrix::Matrix;
+use crate::emsm::matrix::dense::DenseMatrix;
+use crate::emsm::matrix::Matrix;
 use ark_ff::PrimeField;
 use rand::Rng;
 
@@ -146,9 +146,9 @@ mod tests {
     use ark_bls12_381::Fr as F;
     use ark_ff::{One, UniformRand, Zero};
     use rand::thread_rng;
-    use crate::gadgets::matrix::bidiagonal::UnitLowerBidiagonalMatrix;
-    use crate::gadgets::matrix::dense::DenseMatrix;
-    use crate::gadgets::matrix::Matrix;
+    use crate::emsm::matrix::bidiagonal::UnitLowerBidiagonalMatrix;
+    use crate::emsm::matrix::dense::DenseMatrix;
+    use crate::emsm::matrix::Matrix;
 
     #[test]
     fn test_unit_lower_bidiagonal_matrix() {
