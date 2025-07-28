@@ -85,7 +85,7 @@ where
 }
 
 fn nova(c: &mut Criterion) {
-    let n_values: Vec<usize> = vec![1024, 1024 * 1024 * 4];
+    let n_values: Vec<usize> = (10..=20).map(|i| 1 << i).collect();
 
     for &n in &n_values {
         let label = format!("n = 2^{}, n = {}", n.ilog2(), n);
@@ -117,15 +117,15 @@ fn nova(c: &mut Criterion) {
         let (relaxed_u, relaxed_w) = shape.random_relaxed_r1cs(&pp, &mut test_rng());
         shape.is_relaxed_satisfied::<C1>(&relaxed_u, &relaxed_w, &pp).unwrap();
 
-        // (1) Commitment of W
-        c.bench_function(&format!("(1) commitment_W - {}", label), |b| {
+        // Commitment of W
+        c.bench_function(&format!("commitment_W - {}", label), |b| {
             b.iter(|| {
                 let _ = witness.commit::<C1>(&pp);
             });
         });
 
-        // (2) Compute T
-        c.bench_function(&format!("(2) compute_T - {}", label), |b| {
+        // Compute T
+        c.bench_function(&format!("compute_T - {}", label), |b| {
             b.iter(|| {
                 let _ = compute_T(&shape, &relaxed_u, &relaxed_w, &instance, &witness);
             });
@@ -133,48 +133,38 @@ fn nova(c: &mut Criterion) {
 
         let t = compute_T(&shape, &relaxed_u, &relaxed_w, &instance, &witness);
 
-        // (3) Commitment of T
-        c.bench_function(&format!("(3) commit_T - {}", label), |b| {
+        // Commitment of T
+        c.bench_function(&format!("commit_T - {}", label), |b| {
             b.iter(|| {
                 let _ = C1::commit(&pp, t.as_slice());
             });
         });
 
-        // (4) Convert to sponge inputs
-        c.bench_function(&format!("(4) concat input sponge - {}", label), |b| {
+        // Poseidon full hash pipeline
+        c.bench_function(&format!("Poseidon hash pipeline - {}", label), |b| {
             b.iter(|| {
+                // Prepare input
                 let mut input = instance.to_sponge_field_elements();
                 input.extend_from_slice(&relaxed_u.to_sponge_field_elements());
-                std::hint::black_box(input);
-            });
-        });
+                std::hint::black_box(&input);
 
-        let mut input = instance.to_sponge_field_elements();
-        input.extend_from_slice(&relaxed_u.to_sponge_field_elements());
-
-        // (5) Update sponge
-        c.bench_function(&format!("(5) update sponge - {}", label), |b| {
-            b.iter(|| {
+                // Update sponge
                 let mut sponge = PoseidonHash::<ScalarField>::new();
                 sponge.update_sponge(input.clone());
-            });
-        });
 
-        // (6) Output sponge
-        c.bench_function(&format!("(6) output sponge - {}", label), |b| {
-            b.iter(|| {
-                let mut sponge = PoseidonHash::<ScalarField>::new();
-                sponge.update_sponge(input.clone());
+                // Output sponge
                 let _ = sponge.output();
             });
         });
 
         let mut sponge = PoseidonHash::<ScalarField>::new();
+        let mut input = instance.to_sponge_field_elements();
+        input.extend_from_slice(&relaxed_u.to_sponge_field_elements());
         sponge.update_sponge(input.clone());
         let r = sponge.output();
 
-        // (7) Fold witness
-        c.bench_function(&format!("(7) fold witness - {}", label), |b| {
+        // Fold witness
+        c.bench_function(&format!("fold witness - {}", label), |b| {
             b.iter(|| {
                 let _ = relaxed_w.fold(&witness, t.as_slice(), &r).unwrap();
             });
