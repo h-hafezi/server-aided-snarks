@@ -5,5 +5,6 @@ pub mod emsm;
 
 pub mod nova;
 
-mod pcs;
-mod groth16;
+pub mod pcs;
+
+pub mod groth16;
