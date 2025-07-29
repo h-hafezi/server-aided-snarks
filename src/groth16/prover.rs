@@ -1,6 +1,6 @@
 use crate::groth16::{r1cs_to_qap::R1CSToQAP, Groth16, Proof, ProvingKey};
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
-use ark_ff::{PrimeField, UniformRand, Zero};
+use ark_ff::{PrimeField, UniformRand};
 use ark_poly::GeneralEvaluationDomain;
 use ark_relations::r1cs::{
     ConstraintSynthesizer, ConstraintSystem, OptimizationGoal,
