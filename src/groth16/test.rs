@@ -46,7 +46,7 @@ fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing,
 {
-    let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
+    let mut rng = rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     let (pk, vk) = Groth16::<E>::setup(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
     let pvk = prepare_verifying_key::<E>(&vk);
@@ -57,15 +57,14 @@ where
         let mut c = a;
         c *= b;
 
-        let proof = Groth16::<E>::prove(
+        let proof = Groth16::<E>::create_random_proof_with_reduction(
             &pk,
             MySillyCircuit {
                 a: Some(a),
                 b: Some(b),
             },
             &mut rng,
-        )
-            .unwrap();
+        ).unwrap();
 
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[c], &proof).unwrap());
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());

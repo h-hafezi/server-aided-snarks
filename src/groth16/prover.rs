@@ -19,10 +19,9 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
     /// Create a Groth16 proof that is zero-knowledge using the provided
     /// R1CS-to-QAP reduction.
     /// This method samples randomness for zero knowledge via `rng`.
-    #[inline]
     pub fn create_random_proof_with_reduction<C>(
-        circuit: C,
         pk: &ProvingKey<E>,
+        circuit: C,
         rng: &mut impl Rng,
     ) -> R1CSResult<Proof<E>>
     where

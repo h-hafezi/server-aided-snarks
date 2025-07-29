@@ -65,7 +65,7 @@ impl<E: Pairing, QAP: R1CSToQAP> SNARK<E::ScalarField> for Groth16<E, QAP> {
         circuit: C,
         rng: &mut R,
     ) -> Result<Self::Proof, Self::Error> {
-        Self::create_random_proof_with_reduction(circuit, pk, rng)
+        Self::create_random_proof_with_reduction(pk, circuit, rng)
     }
 
     fn process_vk(
