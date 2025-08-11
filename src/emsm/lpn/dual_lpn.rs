@@ -19,7 +19,7 @@ impl<F: PrimeField> DualLPNInstance<F> {
 
 
         // Efficiently compute lpn_vector = z + noise_1
-        let lpn_vector: Vec<F> = t_operator.multiply_sparse(noise_dense.as_mut_slice(), parallel);
+        let lpn_vector: Vec<F> = t_operator.multiply_sparse(noise_dense, parallel);
         
         // return the instance
         DualLPNInstance {

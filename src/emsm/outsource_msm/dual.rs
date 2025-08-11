@@ -1,12 +1,11 @@
-/*use ark_ec::CurveGroup;
+use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use rand::thread_rng;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
-use crate::emsm::lpn::dual_lpn::{DualLPNIndex, DualLPNInstance};
-use crate::emsm::matrix::dense::DenseMatrix;
-use crate::emsm::matrix::Matrix;
+use crate::emsm::lpn::dual_lpn::{DualLPNInstance};
 use crate::emsm::pederson::Pedersen;
+use crate::emsm::raa_code::TOperator;
 use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
@@ -15,19 +14,11 @@ where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>
 {
-    // Public matrix U of size m * n
-    pub u_matrix: DenseMatrix<F>,
-
     // Matrix T is n * N
-    pub index: DualLPNIndex<F>,
+    pub t_operator: TOperator<F>,
 
-    // Group generators for MSM of length m
+    // Group generators for MSM of length n
     pub pedersen: Pedersen<G>,
-
-    // Sizes
-    pub n: usize,   // columns of U = rows of T
-    pub N: usize,   // columns of T
-    pub m: usize,   // rows of U
 }
 
 #[derive(Debug, Clone)]
@@ -35,17 +26,11 @@ pub struct DualEmsmInstance<F>
 where
     F: PrimeField,
 {
-    // Matrix T is n * N
     pub lpn_instance: DualLPNInstance<F>,
-
-    // Sizes
-    pub n: usize,   // columns of U = rows of T
-    pub N: usize,   // columns of T
-    pub m: usize,   // rows of U
 }
 
 pub struct PreprocessedCommitments<G: CurveGroup> {
-    pub p: Pedersen<G>,      // ⟨(U * T)_{*, i}, g⟩ for i in [0, N)
+    pub p: Pedersen<G>,      // ⟨(T)_{*, i}, g⟩ for i in [0, N)
 }
 
 impl<F> DualEmsmInstance<F> where
@@ -195,4 +180,3 @@ mod tests {
         assert_eq!(msm_in_plaintext, decrypted_msm);
     }
 }
- */

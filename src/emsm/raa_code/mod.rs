@@ -35,20 +35,22 @@ where
         Self { p, q, n, N, phantom_data: Default::default() }
     }
 
-    pub fn multiply_sparse(&self, mut e: &mut [F], parallel: bool) -> Vec<F> {
+    pub fn multiply_sparse(&self, mut e: Vec<F>, parallel: bool) -> Vec<F> {
         assert_eq!(e.len(), self.N, "input sparse vector must have size N");
 
         // A * e
-        accumulate_inplace(e.as_mut());
+        accumulate_inplace(e.as_mut_slice());
 
         // Q * A * e
         let mut after_q = permute_safe(e.as_mut(), &self.q, parallel);
+        drop(e);
 
         // A * Q * A * e
         accumulate_inplace(&mut after_q);
 
         // P * A * Q * A * e
         let after_p = permute_safe(after_q.as_mut_slice(), &self.p, parallel);
+        drop(after_q);
 
         // F * P * A * Q * A * e
         self.apply_F_fold(&after_p, parallel)

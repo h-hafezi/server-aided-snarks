@@ -11,14 +11,7 @@ fn bench_dual_lpn(c: &mut Criterion) {
     group.sample_size(10); // Reduce noise and runtime
 
     let params = vec![
-        (1 << 15, 294usize),
-        (1 << 16, 291),
-        (1 << 17, 287),
-        (1 << 18, 284),
-        (1 << 19, 280),
-        (1 << 20, 277),
-        (1 << 21, 273),
-        (1 << 22, 270),
+        (1 << 22, 270usize),
         (1 << 23, 266),
         (1 << 24, 263),
         (1 << 25, 259),
