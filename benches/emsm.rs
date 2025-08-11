@@ -1,4 +1,4 @@
-use criterion::{Criterion, BenchmarkId, criterion_group, criterion_main};
+/*use criterion::{Criterion, BenchmarkId, criterion_group, criterion_main};
 use ark_ff::UniformRand;
 use ark_bls12_381::{Fr as F, G1Projective};
 use ark_std::test_rng;
@@ -94,3 +94,5 @@ fn bench_msm_protocol(c: &mut Criterion) {
 
 criterion_group!(benches, bench_msm_protocol);
 criterion_main!(benches);
+
+ */

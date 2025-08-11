@@ -4,7 +4,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Pedersen<G: CurveGroup> {
     pub generators: Vec<G::MulBase>,
 }

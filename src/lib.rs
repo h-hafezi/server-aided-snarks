@@ -8,3 +8,6 @@ pub mod nova;
 pub mod pcs;
 
 pub mod groth16;
+
+// borrowed from https://github.com/brudnevskij/toyplonk/tree/main
+pub mod plonk;

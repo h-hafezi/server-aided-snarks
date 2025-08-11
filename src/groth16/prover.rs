@@ -13,8 +13,6 @@ use std::ops::Add;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-type D<F> = GeneralEvaluationDomain<F>;
-
 impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
     /// Create a Groth16 proof that is zero-knowledge using the provided
     /// R1CS-to-QAP reduction.
@@ -42,7 +40,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
         circuit.generate_constraints(cs.clone())?;
         debug_assert!(cs.is_satisfied().unwrap());
         cs.finalize();
-        let h = QAP::witness_map::<E::ScalarField, D<E::ScalarField>>(cs.clone())?;
+        let h = QAP::witness_map::<E::ScalarField, GeneralEvaluationDomain<E::ScalarField>>(cs.clone())?;
         let prover = cs.borrow().unwrap();
 
         // first MSM
