@@ -5,7 +5,7 @@ use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use crate::emsm::lpn::dual_lpn::{DualLPNInstance};
 use crate::emsm::pederson::Pedersen;
-use crate::emsm::raa_code::TOperator;
+use crate::emsm::raa_code::{accumulate_inplace, inverse_permutation, permute_safe, TOperator};
 use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
@@ -21,41 +21,19 @@ where
     pub pedersen: Pedersen<G>,
 }
 
-#[derive(Debug, Clone)]
-pub struct DualEmsmInstance<F>
-where
-    F: PrimeField,
-{
-    pub lpn_instance: DualLPNInstance<F>,
-}
-
 pub struct PreprocessedCommitments<G: CurveGroup> {
     pub p: Pedersen<G>,      // ⟨(T)_{*, i}, g⟩ for i in [0, N)
 }
 
-impl<F> DualEmsmInstance<F> where
+impl<F> DualLPNInstance<F> where
     F: PrimeField,
 {
-    pub fn new<G: CurveGroup<ScalarField = F>>(pp: &DualEmsmPublicParams<F, G>, non_zero: usize) -> DualEmsmInstance<F> {
-        let rng = &mut thread_rng();
-
-        let error = SparseVector::<F>::error_vec(4 * pp.n, non_zero, rng);
-        let instance = DualLPNInstance::new(&pp.index, error);
-
-        DualEmsmInstance {
-            lpn_instance: instance,
-            n: pp.n,
-            N: 4 * pp.n,
-            m: pp.m,
-        }
-    }
-
     pub fn mask_witness<G: CurveGroup<ScalarField = F>>(&self, pp: &DualEmsmPublicParams<F, G>, witness: &[F]) -> Vec<F> {
-        assert_eq!(witness.len(), pp.u_matrix.ncols);
+        assert_eq!(witness.len(), pp.t_operator.n);
 
-        assert_eq!(self.lpn_instance.lpn_vector.len(), witness.len(), "Vectors must have equal length");
+        assert_eq!(self.lpn_vector.len(), witness.len(), "Vectors must have equal length");
 
-        self.lpn_instance.lpn_vector.iter()
+        self.lpn_vector.iter()
             .zip(witness.iter())
             .map(|(a, b)| *a + *b)
             .collect()
@@ -66,16 +44,14 @@ impl<F> DualEmsmInstance<F> where
         preprocessed_commitments: &PreprocessedCommitments<G>,
         commitment: G::Affine,
     ) -> G::Affine {
-        let com_1 = preprocessed_commitments.p.commit_sparse(&self.lpn_instance.noise);
+        let com_1 = preprocessed_commitments.p.commit_sparse(&self.noise);
 
         (commitment - com_1).into()
     }
 
     // this function computes the msm in plaintext, can be used to benchmark and also for tests
     pub fn compute_msm_in_plaintext<G: CurveGroup<ScalarField = F>>(&self, pp: &DualEmsmPublicParams<F, G>, witness: &[F]) -> G::Affine {
-        let mapped_witness = pp.u_matrix.right_multiply_vec(witness);
-
-        G::msm(&pp.pedersen.generators, mapped_witness.as_slice())
+        G::msm(&pp.pedersen.generators, witness)
             .expect("MSM computation failed")
             .into_affine()
     }
@@ -85,75 +61,87 @@ impl<F, G> DualEmsmPublicParams<F, G> where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>
 {
-    pub fn new(
-        n: usize,                       // columns of U = rows of T
-        m: usize,                       // rows of U
-        u_matrix: DenseMatrix<F>,       // Public U matrix
-    ) -> Self {
-        assert_eq!((u_matrix.nrows, u_matrix.ncols), (m, n));
+    pub fn new(n: usize) -> Self {
         let rng = &mut thread_rng();
 
         // Construct the Primal LPN Index (T), we put N = 4 * n
-        let index = DualLPNIndex::<F>::new(rng, n, 4 * n, 10);
+        let t_operator = TOperator::<F>::new_random(n);
 
         // Construct Pedersen generators
-        let pedersen = Pedersen::<G>::new(m);
+        let pedersen = Pedersen::<G>::new(n);
 
         DualEmsmPublicParams {
-            index: index.clone(),
-            u_matrix: u_matrix.clone(),
-            pedersen: pedersen.clone(),
-            n,
-            N: 4 * n,
-            m,
+            t_operator,
+            pedersen,
         }
     }
 
     pub fn preprocess(&self) -> PreprocessedCommitments<G> {
         // ⟨(U * T)_{*, i}, g⟩ for i in [0, N)
-        let p: Vec<G::Affine> = (0..self.N).into_par_iter()
-            .map(|i| {
-                let t_col = self.index.get_columns_of_t(i);
-                let h_col = self.u_matrix.right_multiply_vec(t_col.as_slice());
-                G::msm(&self.pedersen.generators, h_col.as_slice())
-                    .expect("MSM computation failed")
-                    .into_affine()
-            })
-            .collect();
+        let generators = &self.pedersen.generators;
+
+        // 1. Expand each generator 4 times
+        let mut expanded = Vec::with_capacity(generators.len() * 4);
+        for g in generators.iter() {
+            expanded.push(g.clone().into());
+            expanded.push(g.clone().into());
+            expanded.push(g.clone().into());
+            expanded.push(g.clone().into());
+        }
+
+        // 2. Inverse permutation p and apply permute_safe
+        let p_inv = inverse_permutation(self.t_operator.p.as_slice());
+        let mut expanded = permute_safe(&mut expanded, &p_inv, true);
+
+        // 3. Reverse → accumulate_inplace → reverse
+        expanded.reverse();
+        accumulate_inplace(&mut expanded, G::zero());
+        expanded.reverse();
+
+        // 4. Inverse permutation q and apply permute_safe
+        let q_inv = inverse_permutation(self.t_operator.q.as_slice());
+        expanded = permute_safe(&mut expanded, &q_inv, true);
+
+        // 5. Reverse → accumulate_inplace → reverse
+        expanded.reverse();
+        accumulate_inplace(&mut expanded, G::zero());
+        expanded.reverse();
 
         PreprocessedCommitments {
-            p: Pedersen{ generators: p }
+            p: Pedersen {
+                generators: expanded.into_iter().map(|x| x.into_affine()).collect(),
+            }
         }
     }
 
     pub fn server_computation(&self, encrypted_witness: Vec<F>) -> G::Affine {
-        // Compute U * z_enc
-        let u_z_enc = self.u_matrix.right_multiply_vec(encrypted_witness.as_slice());
-
-        // Compute ⟨U * z_enc, g⟩
-        let msm_result = G::msm(&self.pedersen.generators, &u_z_enc).unwrap();
+        // Compute ⟨z_enc, g⟩
+        let msm_result = G::msm(&self.pedersen.generators, &encrypted_witness).unwrap();
 
         msm_result.into_affine()
     }
 }
+
 
 #[cfg(test)]
 mod tests {
     use rand::thread_rng;
     use ark_bls12_381::{Fr as F, G1Projective};
     use ark_std::UniformRand;
-    use crate::emsm::outsource_msm::dual::{DualEmsmInstance, DualEmsmPublicParams};
-    use crate::emsm::matrix::dense::DenseMatrix;
+    use crate::emsm::lpn::dual_lpn::DualLPNInstance;
+    use crate::emsm::outsource_msm::dual::{DualEmsmPublicParams};
+    use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
     #[test]
     fn preprocess() {
         let mut rng = thread_rng();
-        let (m, non_zeros, n) = (50, 5, 30usize);
-        let u_matrix = DenseMatrix::<F>::rand(m, n, &mut rng);
+
+        let n = 128;
 
         // generate client/server state
-        let pp = DualEmsmPublicParams::<F, G1Projective>::new(n, m, u_matrix.clone());
-        let emsm_instance = DualEmsmInstance::<F>::new(&pp, non_zeros);
+        let pp = DualEmsmPublicParams::<F, G1Projective>::new(n);
+        let noise = SparseVector::error_vec(n * 4, 30, &mut rng);
+        let emsm_instance = DualLPNInstance::<F>::new(&pp.t_operator, noise, false);
 
         // generate a random witness
         let witness = (0..n).map(|_| F::rand(&mut rng)).collect::<Vec<F>>();

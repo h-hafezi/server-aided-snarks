@@ -15,7 +15,7 @@ impl<F: PrimeField> DualLPNInstance<F> {
         assert_eq!(t_operator.N, noise.size);
 
         // Build noise vector, it will throw error if N < 2^{10} or N > 2^{20}
-        let mut noise_dense = noise.into_dense();
+        let noise_dense = noise.into_dense();
 
 
         // Efficiently compute lpn_vector = z + noise_1

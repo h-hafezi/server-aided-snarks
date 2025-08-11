@@ -8,9 +8,10 @@ use rayon::prelude::ParallelSliceMut;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator};
 use rayon::iter::ParallelIterator;
 
+#[derive(Debug, Clone)]
 pub struct TOperator<F: PrimeField + Copy + AddAssign + Zero> {
-    p: Vec<usize>,
-    q: Vec<usize>,
+    pub p: Vec<usize>,
+    pub q: Vec<usize>,
     pub n: usize,
     pub N: usize,
     phantom_data: PhantomData<F>,
@@ -39,14 +40,14 @@ where
         assert_eq!(e.len(), self.N, "input sparse vector must have size N");
 
         // A * e
-        accumulate_inplace(e.as_mut_slice());
+        accumulate_inplace(e.as_mut_slice(), F::zero());
 
         // Q * A * e
         let mut after_q = permute_safe(e.as_mut(), &self.q, parallel);
         drop(e);
 
         // A * Q * A * e
-        accumulate_inplace(&mut after_q);
+        accumulate_inplace(&mut after_q, F::zero());
 
         // P * A * Q * A * e
         let after_p = permute_safe(after_q.as_mut_slice(), &self.p, parallel);
@@ -89,7 +90,7 @@ where
 }
 
 
-fn permute_safe<T: Default + Copy + Send + Sync>(v: &mut [T], perm: &[usize], parallel: bool, ) -> Vec<T> {
+pub fn permute_safe<T: Default + Copy + Send + Sync>(v: &mut [T], perm: &[usize], parallel: bool, ) -> Vec<T> {
     // make sure the permutation and vector have equal length
     debug_assert_eq!(v.len(), perm.len());
 
@@ -113,12 +114,12 @@ fn permute_safe<T: Default + Copy + Send + Sync>(v: &mut [T], perm: &[usize], pa
     res
 }
 
-fn accumulate_inplace<T: Zero + Clone + AddAssign + PartialEq + Send + Sync>(v: &mut [T]) {
+pub fn accumulate_inplace<T: Clone + AddAssign + PartialEq + Send + Sync>(v: &mut [T], zero: T) {
     let n = v.len();
     if n == 0 { return; }
 
     if n < 1_000 {
-        let mut acc = T::zero();
+        let mut acc = zero.clone();
         for x in v.iter_mut() {
             acc += x.clone();
             *x = acc.clone();
@@ -132,7 +133,7 @@ fn accumulate_inplace<T: Zero + Clone + AddAssign + PartialEq + Send + Sync>(v: 
     let mut totals: Vec<T> = v
         .par_chunks_mut(chunk_size)
         .map(|chunk| {
-            let mut acc = T::zero();
+            let mut acc = zero.clone();
             for x in chunk.iter_mut() {
                 acc += x.clone();
                 *x = acc.clone();
@@ -141,7 +142,7 @@ fn accumulate_inplace<T: Zero + Clone + AddAssign + PartialEq + Send + Sync>(v: 
         })
         .collect();
 
-    let mut offset = T::zero();
+    let mut offset = zero.clone();
     for t in totals.iter_mut() {
         let tmp = t.clone();
         *t = offset.clone();
@@ -153,7 +154,7 @@ fn accumulate_inplace<T: Zero + Clone + AddAssign + PartialEq + Send + Sync>(v: 
         .enumerate()
         .for_each(|(i, chunk)| {
             let off = offsets[i].clone();
-            if off != T::zero() {
+            if off != zero.clone() {
                 for x in chunk.iter_mut() {
                     *x += off.clone();
                 }
@@ -163,7 +164,7 @@ fn accumulate_inplace<T: Zero + Clone + AddAssign + PartialEq + Send + Sync>(v: 
 
 /// Computes the inverse of a permutation `perm`.
 /// `perm` is a slice representing a permutation of `[0..perm.len()]`.
-fn inverse_permutation(perm: &[usize]) -> Vec<usize> {
+pub fn inverse_permutation(perm: &[usize]) -> Vec<usize> {
     let n = perm.len();
     let mut inv = vec![0; n];
     for (i, &p) in perm.iter().enumerate() {
@@ -223,7 +224,7 @@ mod tests {
             Fr::from(4u64),
         ];
 
-        accumulate_inplace(dense.as_mut_slice());
+        accumulate_inplace(dense.as_mut_slice(), Fr::from(0u64));
 
         assert_eq!(dense, expected_full);
     }
