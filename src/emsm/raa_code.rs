@@ -3,9 +3,8 @@ use ark_ff::{PrimeField, Zero};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::ops::AddAssign;
-use ark_std::iterable::Iterable;
 use rayon::prelude::ParallelSliceMut;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator};
 use rayon::iter::ParallelIterator;
 
 #[derive(Debug, Clone)]
@@ -21,7 +20,7 @@ impl<F> TOperator<F>
 where
     F: PrimeField + Copy + AddAssign + Zero,
 {
-    pub fn new_random(n: usize) -> Self {
+    pub fn rand(n: usize) -> Self {
         let N = 4usize.checked_mul(n).expect("overflow computing N = 4*n");
         let mut rng = thread_rng();
 
@@ -180,7 +179,7 @@ mod tests {
     use super::*;
     use ark_bn254::Fr;
     use ark_ff::One;
-    use crate::emsm::sparse_vec::sparse_vec::SparseVector;
+    use crate::emsm::sparse_vec::SparseVector;
 
     #[test]
     fn test_inverse_permutation() {
@@ -199,8 +198,6 @@ mod tests {
 
     #[test]
     fn test_accumulate_sorted_sparse_to_dense() {
-        let n = 2; // N = 8 for this example
-        let op = TOperator::<Fr>::new_random(n);
         // vector: (1, 0, 0, 1, 0, 2, 0, 0)
         let sparse = SparseVector {
             size: 8,

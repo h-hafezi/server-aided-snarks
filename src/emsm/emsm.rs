@@ -1,15 +1,11 @@
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
-use rand::thread_rng;
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
-use crate::emsm::lpn::dual_lpn::{DualLPNInstance};
+use crate::emsm::dual_lpn::{DualLPNInstance};
 use crate::emsm::pederson::Pedersen;
 use crate::emsm::raa_code::{accumulate_inplace, inverse_permutation, permute_safe, TOperator};
-use crate::emsm::sparse_vec::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
-pub struct DualEmsmPublicParams<F, G>
+pub struct EmsmPublicParams<F, G>
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>
@@ -28,7 +24,7 @@ pub struct PreprocessedCommitments<G: CurveGroup> {
 impl<F> DualLPNInstance<F> where
     F: PrimeField,
 {
-    pub fn mask_witness<G: CurveGroup<ScalarField = F>>(&self, pp: &DualEmsmPublicParams<F, G>, witness: &[F]) -> Vec<F> {
+    pub fn mask_witness<G: CurveGroup<ScalarField = F>>(&self, pp: &EmsmPublicParams<F, G>, witness: &[F]) -> Vec<F> {
         assert_eq!(witness.len(), pp.t_operator.n);
 
         assert_eq!(self.lpn_vector.len(), witness.len(), "Vectors must have equal length");
@@ -50,34 +46,31 @@ impl<F> DualLPNInstance<F> where
     }
 
     // this function computes the msm in plaintext, can be used to benchmark and also for tests
-    pub fn compute_msm_in_plaintext<G: CurveGroup<ScalarField = F>>(&self, pp: &DualEmsmPublicParams<F, G>, witness: &[F]) -> G::Affine {
+    pub fn compute_msm_in_plaintext<G: CurveGroup<ScalarField = F>>(&self, pp: &EmsmPublicParams<F, G>, witness: &[F]) -> G::Affine {
         G::msm(&pp.pedersen.generators, witness)
             .expect("MSM computation failed")
             .into_affine()
     }
 }
 
-impl<F, G> DualEmsmPublicParams<F, G> where
+impl<F, G> EmsmPublicParams<F, G> where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>
 {
     pub fn new(n: usize) -> Self {
-        let rng = &mut thread_rng();
-
         // Construct the Primal LPN Index (T), we put N = 4 * n
-        let t_operator = TOperator::<F>::new_random(n);
+        let t_operator = TOperator::<F>::rand(n);
 
         // Construct Pedersen generators
         let pedersen = Pedersen::<G>::new(n);
 
-        DualEmsmPublicParams {
+        EmsmPublicParams {
             t_operator,
             pedersen,
         }
     }
 
     pub fn preprocess(&self) -> PreprocessedCommitments<G> {
-        // ⟨(U * T)_{*, i}, g⟩ for i in [0, N)
         let generators = &self.pedersen.generators;
 
         // 1. Expand each generator 4 times
@@ -128,9 +121,9 @@ mod tests {
     use rand::thread_rng;
     use ark_bls12_381::{Fr as F, G1Projective};
     use ark_std::UniformRand;
-    use crate::emsm::lpn::dual_lpn::DualLPNInstance;
-    use crate::emsm::outsource_msm::dual::{DualEmsmPublicParams};
-    use crate::emsm::sparse_vec::sparse_vec::SparseVector;
+    use crate::emsm::dual_lpn::DualLPNInstance;
+    use crate::emsm::emsm::{EmsmPublicParams};
+    use crate::emsm::sparse_vec::SparseVector;
 
     #[test]
     fn preprocess() {
@@ -139,7 +132,7 @@ mod tests {
         let n = 128;
 
         // generate client/server state
-        let pp = DualEmsmPublicParams::<F, G1Projective>::new(n);
+        let pp = EmsmPublicParams::<F, G1Projective>::new(n);
         let noise = SparseVector::error_vec(n * 4, 30, &mut rng);
         let emsm_instance = DualLPNInstance::<F>::new(&pp.t_operator, noise, false);
 

@@ -2,9 +2,9 @@ use criterion::{Criterion, BenchmarkId, criterion_group, criterion_main};
 use rand::thread_rng;
 
 use ark_bn254::Fr as F;
-use server_aided_SNARK::emsm::lpn::dual_lpn::{DualLPNInstance};
+use server_aided_SNARK::emsm::dual_lpn::{DualLPNInstance};
 use server_aided_SNARK::emsm::raa_code::TOperator;
-use server_aided_SNARK::emsm::sparse_vec::sparse_vec::SparseVector;
+use server_aided_SNARK::emsm::sparse_vec::SparseVector;
 
 fn bench_dual_lpn(c: &mut Criterion) {
     let mut group = c.benchmark_group("dual_lpn");
@@ -23,7 +23,7 @@ fn bench_dual_lpn(c: &mut Criterion) {
         let bench_id = BenchmarkId::new(format!("bench for n=2 ** {}", log_n), "");
 
         let rng = &mut thread_rng();
-        let t_operator = TOperator::<F>::new_random(n);
+        let t_operator = TOperator::<F>::rand(n);
 
         group.bench_with_input(bench_id, &n, |b, &_n| {
             b.iter(|| {

@@ -1,7 +1,6 @@
 use ark_ff::PrimeField;
-use rand::Rng;
 use crate::emsm::raa_code::TOperator;
-use crate::emsm::sparse_vec::sparse_vec::SparseVector;
+use crate::emsm::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone)]
 pub struct DualLPNInstance<F: PrimeField> {
@@ -14,7 +13,6 @@ impl<F: PrimeField> DualLPNInstance<F> {
         // ensure the noise has the right format
         assert_eq!(t_operator.N, noise.size);
 
-        // Build noise vector, it will throw error if N < 2^{10} or N > 2^{20}
         let noise_dense = noise.into_dense();
 
 
@@ -34,15 +32,15 @@ impl<F: PrimeField> DualLPNInstance<F> {
 mod test{
     use rand::thread_rng;
     use ark_bls12_381::Fr as F;
-    use crate::emsm::sparse_vec::sparse_vec::SparseVector;
-    use crate::emsm::lpn::dual_lpn::{DualLPNInstance};
+    use crate::emsm::sparse_vec::SparseVector;
+    use crate::emsm::dual_lpn::{DualLPNInstance};
     use crate::emsm::raa_code::TOperator;
 
     #[test]
     fn test_dual_lpn() {
         let rng = &mut thread_rng();
         let (t, n, N) = (10, 1024 * 1024, 4 * 1024 * 1024);
-        let index = TOperator::<F>::new_random(n);
+        let index = TOperator::<F>::rand(n);
         let error = SparseVector::error_vec(N, t, rng);
         let _ = DualLPNInstance::new(&index, error, true);
     }
