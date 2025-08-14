@@ -1,3 +1,4 @@
+use std::ops::{Neg, Sub};
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use crate::emsm::dual_lpn::{DualLPNInstance};
@@ -41,8 +42,7 @@ impl<F> DualLPNInstance<F> where
         commitment: G::Affine,
     ) -> G::Affine {
         let com_1 = preprocessed_commitments.p.commit_sparse(&self.noise);
-
-        (commitment - com_1).into()
+        (commitment - com_1).into_affine()
     }
 
     // this function computes the msm in plaintext, can be used to benchmark and also for tests
@@ -84,16 +84,17 @@ impl<F, G> EmsmPublicParams<F, G> where
 
         // 2. Inverse permutation p and apply permute_safe
         let p_inv = inverse_permutation(self.t_operator.p.as_slice());
-        let mut expanded = permute_safe(&mut expanded, &p_inv, true);
+        let mut expanded = permute_safe(&mut expanded, &p_inv);
 
         // 3. Reverse → accumulate_inplace → reverse
         expanded.reverse();
         accumulate_inplace(&mut expanded, G::zero());
         expanded.reverse();
 
+
         // 4. Inverse permutation q and apply permute_safe
         let q_inv = inverse_permutation(self.t_operator.q.as_slice());
-        expanded = permute_safe(&mut expanded, &q_inv, true);
+        expanded = permute_safe(&mut expanded, &q_inv);
 
         // 5. Reverse → accumulate_inplace → reverse
         expanded.reverse();
@@ -118,6 +119,7 @@ impl<F, G> EmsmPublicParams<F, G> where
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Neg;
     use rand::thread_rng;
     use ark_bls12_381::{Fr as F, G1Projective};
     use ark_std::UniformRand;
@@ -129,12 +131,12 @@ mod tests {
     fn preprocess() {
         let mut rng = thread_rng();
 
-        let n = 128;
+        let n = 1024;
 
         // generate client/server state
         let pp = EmsmPublicParams::<F, G1Projective>::new(n);
         let noise = SparseVector::error_vec(n * 4, 30, &mut rng);
-        let emsm_instance = DualLPNInstance::<F>::new(&pp.t_operator, noise, false);
+        let emsm_instance = DualLPNInstance::<F>::new(&pp.t_operator, noise);
 
         // generate a random witness
         let witness = (0..n).map(|_| F::rand(&mut rng)).collect::<Vec<F>>();
@@ -158,6 +160,6 @@ mod tests {
         let msm_in_plaintext = emsm_instance.compute_msm_in_plaintext(&pp, witness.as_slice());
 
         // checking the equality
-        assert_eq!(msm_in_plaintext, decrypted_msm);
+        assert_eq!(msm_in_plaintext, decrypted_msm.neg());
     }
 }

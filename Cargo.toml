@@ -78,3 +78,16 @@ name = "nova"
 [[bench]]
 harness = false
 name = "groth16"
+
+[[bench]]
+harness = false
+name = "accumulate"
+
+[[bench]]
+harness = false
+name = "permutation"
+
+[[bench]]
+harness = false
+name = "f_fold"
+

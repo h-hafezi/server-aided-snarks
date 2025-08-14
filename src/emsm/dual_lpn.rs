@@ -9,7 +9,7 @@ pub struct DualLPNInstance<F: PrimeField> {
 }
 
 impl<F: PrimeField> DualLPNInstance<F> {
-    pub fn new(t_operator: &TOperator<F>, noise: SparseVector<F>, parallel: bool) -> Self {
+    pub fn new(t_operator: &TOperator<F>, noise: SparseVector<F>) -> Self {
         // ensure the noise has the right format
         assert_eq!(t_operator.N, noise.size);
 
@@ -17,7 +17,7 @@ impl<F: PrimeField> DualLPNInstance<F> {
 
 
         // Efficiently compute lpn_vector = z + noise_1
-        let lpn_vector: Vec<F> = t_operator.multiply_sparse(noise_dense, parallel);
+        let lpn_vector: Vec<F> = t_operator.multiply_sparse(noise_dense);
         
         // return the instance
         DualLPNInstance {
@@ -42,7 +42,7 @@ mod test{
         let (t, n, N) = (10, 1024 * 1024, 4 * 1024 * 1024);
         let index = TOperator::<F>::rand(n);
         let error = SparseVector::error_vec(N, t, rng);
-        let _ = DualLPNInstance::new(&index, error, true);
+        let _ = DualLPNInstance::new(&index, error);
     }
 }
  

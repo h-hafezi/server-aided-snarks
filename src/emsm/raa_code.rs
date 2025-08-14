@@ -2,14 +2,16 @@ use std::marker::PhantomData;
 use ark_ff::{PrimeField, Zero};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::ops::AddAssign;
+use std::ops::{AddAssign, SubAssign};
 use rayon::prelude::ParallelSliceMut;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator};
 use rayon::iter::ParallelIterator;
 
 #[derive(Debug, Clone)]
 pub struct TOperator<F: PrimeField + Copy + AddAssign + Zero> {
+    /// permutation p : [N] -> [N]
     pub p: Vec<usize>,
+    /// permutation q : [N] -> [N]
     pub q: Vec<usize>,
     pub n: usize,
     pub N: usize,
@@ -35,68 +37,40 @@ where
         Self { p, q, n, N, phantom_data: Default::default() }
     }
 
-    pub fn multiply_sparse(&self, mut e: Vec<F>, parallel: bool) -> Vec<F> {
+    pub fn multiply_sparse(&self, mut e: Vec<F>) -> Vec<F> {
         assert_eq!(e.len(), self.N, "input sparse vector must have size N");
 
         // A * e
         accumulate_inplace(e.as_mut_slice(), F::zero());
 
         // Q * A * e
-        let mut after_q = permute_safe(e.as_mut(), &self.q, parallel);
+        let mut after_q = permute_safe(e.as_mut(), &self.q);
         drop(e);
 
         // A * Q * A * e
         accumulate_inplace(&mut after_q, F::zero());
 
         // P * A * Q * A * e
-        let after_p = permute_safe(after_q.as_mut_slice(), &self.p, parallel);
+        let after_p = permute_safe(after_q.as_mut_slice(), &self.p);
         drop(after_q);
 
         // F * P * A * Q * A * e
-        self.apply_F_fold(&after_p, parallel)
-    }
-
-    fn apply_F_fold(&self, v: &Vec<F>, parallel: bool) -> Vec<F> {
-        assert_eq!(v.len(), self.N);
-        let mut out = vec![F::zero(); self.n];
-
-        if parallel {
-            out.par_iter_mut()
-                .enumerate()
-                .for_each(|(i, out_i)| {
-                    let base = 4 * i;
-                    let mut s = F::zero();
-                    s += v[base];
-                    s += v[base + 1];
-                    s += v[base + 2];
-                    s += v[base + 3];
-                    *out_i = s;
-                });
-        } else {
-            for i in 0..self.n {
-                let base = 4 * i;
-                let mut s = F::zero();
-                s += v[base];
-                s += v[base + 1];
-                s += v[base + 2];
-                s += v[base + 3];
-                out[i] = s;
-            }
-        }
-
-        out
+        apply_F_fold(&after_p)
     }
 }
 
 
-pub fn permute_safe<T: Default + Copy + Send + Sync>(v: &mut [T], perm: &[usize], parallel: bool, ) -> Vec<T> {
-    // make sure the permutation and vector have equal length
+pub fn permute_safe<T: Default + Copy + Send + Sync>(v: &mut [T], perm: &[usize]) -> Vec<T> {
+    // Make sure the permutation and vector have equal length
     debug_assert_eq!(v.len(), perm.len());
 
-    // make a vector with default value
+    // Create a result vector with default values
     let mut res = vec![T::default(); v.len()];
 
-    if parallel {
+    // Threshold for switching to parallel
+    const PARALLEL_THRESHOLD: usize = 1 << 16;
+
+    if v.len() > PARALLEL_THRESHOLD {
         // Parallel version using rayon
         res.par_iter_mut()
             .enumerate()
@@ -113,27 +87,41 @@ pub fn permute_safe<T: Default + Copy + Send + Sync>(v: &mut [T], perm: &[usize]
     res
 }
 
-pub fn accumulate_inplace<T: Clone + AddAssign + PartialEq + Send + Sync>(v: &mut [T], zero: T) {
-    let n = v.len();
-    if n == 0 { return; }
 
-    if n < 1_000 {
+/// (g_0, ..., g_n) ==> (\sum g_i, \sum g_i - g_1, ..., g_n)
+
+pub fn accumulate_inplace<T>(v: &mut [T], zero: T)
+where
+    T: Clone + AddAssign + SubAssign + PartialEq + Send + Sync,
+{
+    let n = v.len();
+    if n == 0 {
+        return;
+    }
+
+    const PARALLEL_THRESHOLD: usize = 1 << 19;
+
+    if n <= PARALLEL_THRESHOLD {
+        // Serial case
         let mut acc = zero.clone();
-        for x in v.iter_mut() {
+        for x in v.iter_mut().rev() {
             acc += x.clone();
             *x = acc.clone();
         }
         return;
     }
 
+    // Parallel case
     let num_chunks = (rayon::current_num_threads() * 4).min(n);
     let chunk_size = (n + num_chunks - 1) / num_chunks;
 
+    // Step 1: Compute partial suffix sums in each chunk (right-to-left)
     let mut totals: Vec<T> = v
         .par_chunks_mut(chunk_size)
+        .rev()
         .map(|chunk| {
             let mut acc = zero.clone();
-            for x in chunk.iter_mut() {
+            for x in chunk.iter_mut().rev() {
                 acc += x.clone();
                 *x = acc.clone();
             }
@@ -141,18 +129,19 @@ pub fn accumulate_inplace<T: Clone + AddAssign + PartialEq + Send + Sync>(v: &mu
         })
         .collect();
 
+    // Step 2: Compute cumulative sums of totals (so each chunk knows how much to add)
     let mut offset = zero.clone();
-    for t in totals.iter_mut() {
+    for t in totals.iter_mut().rev() {
         let tmp = t.clone();
         *t = offset.clone();
         offset += tmp;
     }
 
-    let offsets = totals;
+    // Step 3: Add offsets to chunks
     v.par_chunks_mut(chunk_size)
         .enumerate()
         .for_each(|(i, chunk)| {
-            let off = offsets[i].clone();
+            let off = totals[num_chunks - 1 - i].clone();
             if off != zero.clone() {
                 for x in chunk.iter_mut() {
                     *x += off.clone();
@@ -160,6 +149,42 @@ pub fn accumulate_inplace<T: Clone + AddAssign + PartialEq + Send + Sync>(v: &mu
             }
         });
 }
+
+fn apply_F_fold<F: PrimeField>(v: &Vec<F>) -> Vec<F> {
+    const PARALLEL_THRESHOLD: usize = 1 << 16; // 65,536 elements
+
+    assert_eq!(v.len() % 4, 0);
+    let mut out = vec![F::zero(); v.len() / 4];
+
+    if v.len() > PARALLEL_THRESHOLD {
+        // Parallel version
+        out.par_iter_mut()
+            .enumerate()
+            .for_each(|(i, out_i)| {
+                let base = 4 * i;
+                let mut s = F::zero();
+                s += v[base];
+                s += v[base + 1];
+                s += v[base + 2];
+                s += v[base + 3];
+                *out_i = s;
+            });
+    } else {
+        // Sequential version
+        for i in 0..v.len() / 4 {
+            let base = 4 * i;
+            let mut s = F::zero();
+            s += v[base];
+            s += v[base + 1];
+            s += v[base + 2];
+            s += v[base + 3];
+            out[i] = s;
+        }
+    }
+
+    out
+}
+
 
 /// Computes the inverse of a permutation `perm`.
 /// `perm` is a slice representing a permutation of `[0..perm.len()]`.
@@ -177,9 +202,13 @@ pub fn inverse_permutation(perm: &[usize]) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark_bn254::Fr;
-    use ark_ff::One;
-    use crate::emsm::sparse_vec::SparseVector;
+
+    #[test]
+    fn test_suffix_accumulate_small() {
+        let mut v = vec![1, 2, 3, 4];
+        accumulate_inplace(&mut v, 0);
+        assert_eq!(v, vec![10, 9, 7, 4]);
+    }
 
     #[test]
     fn test_inverse_permutation() {
@@ -194,35 +223,5 @@ mod tests {
             assert_eq!(perm[inv[i]], i);
             assert_eq!(inv[perm[i]], i);
         }
-    }
-
-    #[test]
-    fn test_accumulate_sorted_sparse_to_dense() {
-        // vector: (1, 0, 0, 1, 0, 2, 0, 0)
-        let sparse = SparseVector {
-            size: 8,
-            entries: vec![
-                (0, Fr::one()),
-                (3, Fr::one()),
-                (5, Fr::from(2u64)),
-            ],
-        };
-
-        let mut dense = sparse.into_dense();
-
-        let expected_full = vec![
-            Fr::from(1u64),
-            Fr::from(1u64),
-            Fr::from(1u64),
-            Fr::from(2u64),
-            Fr::from(2u64),
-            Fr::from(4u64),
-            Fr::from(4u64),
-            Fr::from(4u64),
-        ];
-
-        accumulate_inplace(dense.as_mut_slice(), Fr::from(0u64));
-
-        assert_eq!(dense, expected_full);
     }
 }
