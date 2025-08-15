@@ -7,8 +7,11 @@ use ark_r1cs_std::prelude::*;
 use ark_ec::short_weierstrass::{Affine, Projective, SWCurveConfig};
 use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 use ark_ff::PrimeField;
-
-use server_aided_SNARK::nova::constant_for_curves::{ScalarField, C1, G1};
+use rand::thread_rng;
+use server_aided_SNARK::emsm::dual_lpn::DualLPNInstance;
+use server_aided_SNARK::emsm::emsm::EmsmPublicParams;
+use server_aided_SNARK::emsm::sparse_vec::SparseVector;
+use server_aided_SNARK::nova::constant_for_curves::{G1Projective, ScalarField, C1, G1};
 use server_aided_SNARK::nova::gadgets::r1cs::{
     R1CSShape, R1CSInstance, R1CSWitness, RelaxedR1CSInstance, RelaxedR1CSWitness,
 };
@@ -85,22 +88,36 @@ where
 }
 
 fn nova(c: &mut Criterion) {
-    let n_values: Vec<usize> = (10..=20).map(|i| 1 << i).collect();
+    let params = vec![
+        (1 << 15, 294usize),
+        (1 << 16, 291),
+        (1 << 17, 287),
+        (1 << 18, 284),
+        (1 << 19, 280),
+        (1 << 20, 277),
+        (1 << 21, 273),
+        (1 << 22, 270),
+    ];
 
-    for &n in &n_values {
-        let label = format!("n = 2^{}, n = {}", n.ilog2(), n);
+    for (n, k) in &params {
+        let label = format!("n = 2^{}, n = {}", (n.clone() as usize).ilog2(), n.clone());
 
         let num_constraints = n / 2;
         let num_vars = n;
         let num_io = 2;
 
-        let pp = C1::setup(n, b"teset", &());
+        let pp = C1::setup(*n, b"teset", &());
         let cs = generate_random_constraint_system::<ScalarField>(
             num_constraints,
-            num_vars,
+            *num_vars,
             num_io,
         );
         assert!(cs.is_satisfied().unwrap());
+
+        // emsm parameters
+        let emsm_pp = EmsmPublicParams::<ScalarField, G1Projective>::new(*n, pp.clone());
+        let preprocessed_commitments = emsm_pp.preprocess();
+
 
         let (shape, instance, witness) = {
             let shape = R1CSShape::<G1>::from(cs.clone());
@@ -124,6 +141,21 @@ fn nova(c: &mut Criterion) {
             });
         });
 
+        let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+        let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+        let encrypted_witness = emsm_instance.mask_witness(&emsm_pp, witness.W.as_slice());
+        let encrypted_msm = emsm_pp.server_computation(encrypted_witness.clone());
+
+        c.bench_function(&format!("EMSM commit_W - {}", label), |b| {
+            b.iter(|| {
+                let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+                let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+                let _ = emsm_instance.mask_witness(&emsm_pp, witness.W.as_slice());
+                let _ = emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone());
+            });
+        });
+
+
         // Compute T
         c.bench_function(&format!("compute_T - {}", label), |b| {
             b.iter(|| {
@@ -139,6 +171,24 @@ fn nova(c: &mut Criterion) {
                 let _ = C1::commit(&pp, t.as_slice());
             });
         });
+
+        let m = *n / 2;
+        let emsm_pp = EmsmPublicParams::<ScalarField, G1Projective>::new(m, pp[0..m].to_vec());
+        let preprocessed_commitments = emsm_pp.preprocess();
+        let noise = SparseVector::<ScalarField>::error_vec(m * 4, *k, &mut thread_rng());
+        let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+        let encrypted_witness = emsm_instance.mask_witness(&emsm_pp, t.as_slice());
+        let encrypted_msm = emsm_pp.server_computation(encrypted_witness.clone());
+
+        c.bench_function(&format!("EMSM commit_T - {}", label), |b| {
+            b.iter(|| {
+                let noise = SparseVector::<ScalarField>::error_vec(m * 4, *k, &mut thread_rng());
+                let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+                let _ = emsm_instance.mask_witness(&emsm_pp, t.as_slice());
+                let _ = emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone());
+            });
+        });
+
 
         // Poseidon full hash pipeline
         c.bench_function(&format!("Poseidon hash pipeline - {}", label), |b| {

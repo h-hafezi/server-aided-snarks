@@ -3,6 +3,7 @@ use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, black_b
 use rand::thread_rng;
 use server_aided_SNARK::emsm::dual_lpn::DualLPNInstance;
 use server_aided_SNARK::emsm::emsm::EmsmPublicParams;
+use server_aided_SNARK::emsm::pederson::Pedersen;
 use server_aided_SNARK::emsm::sparse_vec::SparseVector;
 
 type F = ark_bn254::Fr;
@@ -24,7 +25,8 @@ fn bench_emsm(c: &mut Criterion) {
 
     for (n, k) in &params {
         // ------------------- Precompute common data -------------------
-        let pp = EmsmPublicParams::<F, G1Projective>::new(*n);
+        let pederson = Pedersen::<ark_bls12_381::G1Projective>::new(*n);
+        let pp = EmsmPublicParams::<F, G1Projective>::new(*n, pederson.generators);
 
         // Benchmark SparseVector::error_vec
         c.bench_with_input(BenchmarkId::new("error_vec", n), n, |b, &_n| {

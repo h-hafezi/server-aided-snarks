@@ -57,16 +57,13 @@ impl<F, G> EmsmPublicParams<F, G> where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>
 {
-    pub fn new(n: usize) -> Self {
+    pub fn new(n: usize, generators: Vec<G::MulBase>) -> Self {
         // Construct the Primal LPN Index (T), we put N = 4 * n
         let t_operator = TOperator::<F>::rand(n);
-
-        // Construct Pedersen generators
-        let pedersen = Pedersen::<G>::new(n);
-
+        
         EmsmPublicParams {
             t_operator,
-            pedersen,
+            pedersen: Pedersen { generators },
         }
     }
 
@@ -125,6 +122,7 @@ mod tests {
     use ark_std::UniformRand;
     use crate::emsm::dual_lpn::DualLPNInstance;
     use crate::emsm::emsm::{EmsmPublicParams};
+    use crate::emsm::pederson::Pedersen;
     use crate::emsm::sparse_vec::SparseVector;
 
     #[test]
@@ -134,7 +132,8 @@ mod tests {
         let n = 1024;
 
         // generate client/server state
-        let pp = EmsmPublicParams::<F, G1Projective>::new(n);
+        let pederson = Pedersen::<G1Projective>::new(n);
+        let pp = EmsmPublicParams::<F, G1Projective>::new(n, pederson.generators);
         let noise = SparseVector::error_vec(n * 4, 30, &mut rng);
         let emsm_instance = DualLPNInstance::<F>::new(&pp.t_operator, noise);
 

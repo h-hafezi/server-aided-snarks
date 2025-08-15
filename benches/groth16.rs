@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use ark_bn254::Bn254;
-use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
-use ark_ff::{PrimeField, UniformRand};
+use ark_bn254::{Bn254, G2Projective};
+use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, VariableBaseMSM};
+use ark_ff::{BigInteger, PrimeField, UniformRand};
 use ark_relations::r1cs::{ConstraintSystemRef, ConstraintSystem, OptimizationGoal, ConstraintSynthesizer};
 use ark_r1cs_std::alloc::AllocVar;
 use ark_r1cs_std::fields::fp::FpVar;
@@ -13,11 +13,24 @@ use std::ops::{Add, Mul};
 use std::marker::PhantomData;
 use ark_crypto_primitives::snark::CircuitSpecificSetupSNARK;
 use ark_ec::bn::Bn;
-use server_aided_SNARK::nova::constant_for_curves::{ScalarField};
+use server_aided_SNARK::nova::constant_for_curves::{G1Affine, G1Projective, ScalarField};
 use ark_std::rand::RngCore;
+use rand::thread_rng;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use rayon::iter::IntoParallelRefIterator;
+use server_aided_SNARK::emsm::dual_lpn::DualLPNInstance;
+use server_aided_SNARK::emsm::emsm::EmsmPublicParams;
+use server_aided_SNARK::emsm::sparse_vec::SparseVector;
+
+pub fn cast_field<Fr, Fq>(first_field: Fr) -> Fq
+where
+    Fr: PrimeField,
+    Fq: PrimeField,
+{
+    let bytes = first_field.into_bigint().to_bytes_le();
+    Fq::from_le_bytes_mod_order(bytes.as_slice())
+}
 
 struct RandomCircuit<F: PrimeField> {
     num_constraints: usize,
@@ -49,8 +62,19 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for RandomCircuit<F> {
 }
 
 fn bench_groth16(c: &mut Criterion) {
-    for exp in 10..=20 {
-        let n = 1 << exp;
+    let params = vec![
+        (1 << 15, 294usize),
+        (1 << 16, 291),
+        (1 << 17, 287),
+        (1 << 18, 284),
+        (1 << 19, 280),
+        (1 << 20, 277),
+        (1 << 21, 273),
+        (1 << 22, 270),
+    ];
+
+    for (n, k) in &params {
+        let n = n.clone();
         let num_constraints = n / 2;
         let num_vars = n;
         let num_io = 2;
@@ -87,7 +111,7 @@ fn bench_groth16(c: &mut Criterion) {
 
         let prover = cs.borrow().unwrap();
 
-        let id = format!("witness_map_exp_{}", exp);
+        let id = format!("witness_map_exp_{}", n);
         c.bench_function(&id, |b| {
             b.iter(|| {
                 let _h = LibsnarkReduction::witness_map::<ScalarField, GeneralEvaluationDomain<ScalarField>>(cs.clone()).unwrap();
@@ -102,7 +126,7 @@ fn bench_groth16(c: &mut Criterion) {
             .collect::<Vec<_>>();
         let h_acc = <Bn<ark_bn254::Config> as Pairing>::G1::msm_bigint(&pk.h_query, &h_assignment);
 
-        let id = format!("first msm {}", exp);
+        let id = format!("first msm {}", n);
         c.bench_function(&id, |b| {
             b.iter(|| {
                 let h_assignment = cfg_into_iter!(&h)
@@ -112,6 +136,26 @@ fn bench_groth16(c: &mut Criterion) {
             })
         });
 
+        let emsm_pp = {
+            let mut v = pk.h_query.clone();
+            v.push(G1Affine::zero());
+            EmsmPublicParams::<ScalarField, G1Projective>::new(n, v)
+        };
+        let preprocessed_commitments = emsm_pp.preprocess();
+
+        let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+        let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+        let encrypted_witness = emsm_instance.mask_witness(&emsm_pp, h.as_slice());
+        let encrypted_msm = emsm_pp.server_computation(encrypted_witness.clone());
+
+        c.bench_function(&format!("first emsm - {}", n), |b| {
+            b.iter(|| {
+                let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+                let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+                let _ = emsm_instance.mask_witness(&emsm_pp, h.as_slice());
+                let _ = emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone());
+            });
+        });
 
         // second MSM
         let aux_assignment_bigint = cfg_iter!(&prover.witness_assignment)
@@ -119,7 +163,7 @@ fn bench_groth16(c: &mut Criterion) {
             .collect::<Vec<_>>();
         let l_aux_acc = <Bn<ark_bn254::Config> as Pairing>::G1::msm_bigint(&pk.l_query, &aux_assignment_bigint);
 
-        let id = format!("second msm {}", exp);
+        let id = format!("second msm {}", n);
         c.bench_function(&id, |b| {
             b.iter(|| {
                 let aux_assignment_bigint = cfg_iter!(&prover.witness_assignment)
@@ -129,6 +173,22 @@ fn bench_groth16(c: &mut Criterion) {
             })
         });
 
+        // emsm parameters
+        let emsm_pp = EmsmPublicParams::<ScalarField, G1Projective>::new(n, pk.l_query.clone());
+        let preprocessed_commitments = emsm_pp.preprocess();
+        let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+        let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+        let encrypted_witness = emsm_instance.mask_witness(&emsm_pp, prover.witness_assignment.as_slice());
+        let encrypted_msm = emsm_pp.server_computation(encrypted_witness.clone());
+
+        c.bench_function(&format!("second emsm - {}", n), |b| {
+            b.iter(|| {
+                let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+                let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+                let _ = emsm_instance.mask_witness(&emsm_pp, prover.witness_assignment.as_slice());
+                let _ = emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone());
+            });
+        });
 
         // other operations
         let r_s_delta_g1 = pk.delta_g1 * (r * s);
@@ -141,7 +201,7 @@ fn bench_groth16(c: &mut Criterion) {
         // Compute A
         let r_g1 = pk.delta_g1.mul(r);
 
-        let id = format!("other operation (1) {}", exp);
+        let id = format!("other operation (1) {}", n);
         c.bench_function(&id, |b| {
             b.iter(|| {
                 // other operations
@@ -164,7 +224,7 @@ fn bench_groth16(c: &mut Criterion) {
             r_g1 + el + acc + pk.vk.alpha_g1
         };
 
-        let id = format!("third msm {}", exp);
+        let id = format!("third msm {}", n);
         c.bench_function(&id, |b| {
             b.iter(|| {
                 let _ = {
@@ -174,6 +234,27 @@ fn bench_groth16(c: &mut Criterion) {
                 };
             })
         });
+
+        // define new msm (not big int)
+        let assignment_f = [&prover.instance_assignment[1..], &prover.witness_assignment[1..]].concat();
+
+        // emsm parameters
+        let emsm_pp = EmsmPublicParams::<ScalarField, G1Projective>::new(n, pk.a_query[2..].to_vec());
+        let preprocessed_commitments = emsm_pp.preprocess();
+        let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+        let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+        let encrypted_witness = emsm_instance.mask_witness(&emsm_pp, assignment_f.as_slice());
+        let encrypted_msm = emsm_pp.server_computation(encrypted_witness.clone());
+
+        c.bench_function(&format!("third emsm - {}", n), |b| {
+            b.iter(|| {
+                let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+                let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+                let _ = emsm_instance.mask_witness(&emsm_pp, assignment_f.as_slice());
+                let _ = emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone());
+            });
+        });
+
 
 
         let s_g_a = g_a * &s;
@@ -187,7 +268,7 @@ fn bench_groth16(c: &mut Criterion) {
             s_g1 + el + acc + pk.beta_g1
         };
 
-        let id = format!("forth msm {}", exp);
+        let id = format!("forth msm {}", n);
         c.bench_function(&id, |b| {
             b.iter(|| {
                 let s_g1 = pk.delta_g1.mul(s);
@@ -199,6 +280,20 @@ fn bench_groth16(c: &mut Criterion) {
             })
         });
 
+        // emsm parameters
+        let emsm_pp = EmsmPublicParams::<ScalarField, G1Projective>::new(n, pk.b_g1_query[2..].to_vec());
+        let preprocessed_commitments = emsm_pp.preprocess();
+        let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+        let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+        let encrypted_witness = emsm_instance.mask_witness(&emsm_pp, assignment_f.as_slice());
+        let encrypted_msm = emsm_pp.server_computation(encrypted_witness.clone());
+
+        c.bench_function(&format!("forth emsm - {}", n), |b| {
+            b.iter(|| {
+                // this instance is already encrypted, don't have to encrypt it again
+                let _ = emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone());
+            });
+        });
 
         // Compute B in G2
         let s_g2 = pk.vk.delta_g2.mul(s);
@@ -210,7 +305,7 @@ fn bench_groth16(c: &mut Criterion) {
             s_g2.add(&el).add(&acc).add(&pk.vk.beta_g2)
         };
 
-        let id = format!("fifth msm {}", exp);
+        let id = format!("fifth msm {}", n);
         c.bench_function(&id, |b| {
             b.iter(|| {
                 let _ = pk.b_g2_query[0];
@@ -220,6 +315,25 @@ fn bench_groth16(c: &mut Criterion) {
             })
         });
 
+        let assignment_f = [&prover.instance_assignment[1..], &prover.witness_assignment[1..]].concat();
+
+
+        // emsm parameters
+        let emsm_pp = EmsmPublicParams::<ScalarField, G2Projective>::new(n, pk.b_g2_query[2..].to_vec());
+        let preprocessed_commitments = emsm_pp.preprocess();
+        let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+        let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+        let encrypted_witness = emsm_instance.mask_witness(&emsm_pp, assignment_f.as_slice());
+        let encrypted_msm = emsm_pp.server_computation(encrypted_witness.clone());
+
+        c.bench_function(&format!("fifth emsm - {}", n), |b| {
+            b.iter(|| {
+                // this instance is already encrypted, don't have to encrypt it again
+                let _ = emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone());
+            });
+        });
+
+
         let r_g1_b = g1_b * &r;
 
         let mut g_c = s_g_a;
@@ -228,7 +342,7 @@ fn bench_groth16(c: &mut Criterion) {
         g_c += &l_aux_acc;
         g_c += &h_acc;
 
-        let id = format!("other operations (2) {}", exp);
+        let id = format!("other operations (2) {}", n);
         c.bench_function(&id, |b| {
             b.iter(|| {
                 let r_g1_b = g1_b * &r;
