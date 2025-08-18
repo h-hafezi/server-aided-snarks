@@ -40,7 +40,7 @@ where
         );
 
         // Only use as many generators as needed
-        G::msm_unchecked(&self.generators[..scalars.len()], scalars)
+        G::msm_unchecked(self.generators.as_slice(), scalars)
     }
 
     /// Sparse commitment: computes commitment using only non-zero entries of the sparse vector.

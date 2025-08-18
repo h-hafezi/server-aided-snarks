@@ -5,6 +5,7 @@ use ark_std::{test_rng, fs::File,};
 use std::fs;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
+use ark_ec::VariableBaseMSM;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 use server_aided_SNARK::emsm::pederson::Pedersen;
@@ -53,7 +54,8 @@ fn bench_pedersen(c: &mut Criterion) {
         let log_n = usize::BITS - (n as usize).leading_zeros() - 1;
 
         // Load or generate Pedersen setup
-        let pedersen = load_or_generate_pedersen(n);
+        let binding = load_or_generate_pedersen(n).generators;
+        let generators = binding.as_slice();
 
         // Prepare random scalars
         let mut rng = test_rng();
@@ -63,7 +65,7 @@ fn bench_pedersen(c: &mut Criterion) {
         let commit_id = BenchmarkId::new(format!("commit n=2^{}", log_n), "");
         group.bench_with_input(commit_id, &n, |b, &_n| {
             b.iter(|| {
-                let _commitment = pedersen.commit(&scalars);
+                let _ = G1Projective::msm_unchecked(generators, scalars.as_slice());
             });
         });
     }
