@@ -13,11 +13,6 @@ fn bench_emsm(c: &mut Criterion) {
     let mut rng = thread_rng();
 
     let params = vec![
-        (1 << 15, 294usize),
-        (1 << 16, 291),
-        (1 << 17, 287),
-        (1 << 18, 284),
-        (1 << 19, 280),
         (1 << 20, 277),
         (1 << 21, 273),
         (1 << 22, 270),
@@ -25,7 +20,7 @@ fn bench_emsm(c: &mut Criterion) {
 
     for (n, k) in &params {
         // ------------------- Precompute common data -------------------
-        let pederson = Pedersen::<ark_bls12_381::G1Projective>::new(*n);
+        let pederson = Pedersen::<ark_bn254::G1Projective>::new(*n);
         let pp = EmsmPublicParams::<F, G1Projective>::new(*n, pederson.generators);
 
         // Benchmark SparseVector::error_vec
@@ -74,3 +69,5 @@ criterion_group!{
     targets = bench_emsm
 }
 criterion_main!(benches);
+
+

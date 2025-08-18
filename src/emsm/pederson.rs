@@ -6,12 +6,12 @@ use crate::emsm::sparse_vec::SparseVector;
 
 #[derive(Debug, Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Pedersen<G: CurveGroup> {
-    pub generators: Vec<G::MulBase>,
+    pub generators: Vec<G::Affine>,
 }
 
 impl<G: CurveGroup> Pedersen<G>
 where
-    G::MulBase: CanonicalSerialize + CanonicalDeserialize,
+    G::Affine: CanonicalSerialize + CanonicalDeserialize,
 {
     /// Create a new Pedersen commitment instance with `n` generators.
     /// The generators are deterministically derived from the label.
@@ -24,29 +24,29 @@ where
             .map(|_| G::rand(&mut rng))
             .collect();
 
-        let mul_bases = ScalarMul::batch_convert_to_mul_base(&gens);
+        let generators: Vec<G::Affine> = G::normalize_batch(&gens);
 
         Pedersen {
-            generators: mul_bases,
+            generators,
         }
     }
 
     /// Commit to a vector of scalars.
     /// The length of `scalars` must be less than or equal to the number of generators.
     pub fn commit(&self, scalars: &[G::ScalarField]) -> G {
-        assert!(
+        debug_assert!(
             scalars.len() <= self.generators.len(),
             "Too many scalars for the number of generators"
         );
 
         // Only use as many generators as needed
-        VariableBaseMSM::msm_unchecked(&self.generators[..scalars.len()], scalars)
+        G::msm_unchecked(&self.generators[..scalars.len()], scalars)
     }
 
     /// Sparse commitment: computes commitment using only non-zero entries of the sparse vector.
     pub fn commit_sparse(&self, vector: &SparseVector<G::ScalarField>) -> G {
         for (i, _) in vector.entries.iter() {
-            assert!(
+            debug_assert!(
                 *i < self.generators.len(),
                 "Index {} out of bounds for number of generators {}",
                 i,
@@ -54,7 +54,7 @@ where
             );
         }
 
-        assert_eq!(vector.size, self.generators.len());
+        debug_assert_eq!(vector.size, self.generators.len());
 
         let bases: Vec<G::Affine> = vector.entries.iter().map(|(i, _)| self.generators[*i]).collect();
         let scalars: Vec<G::ScalarField> = vector.entries.iter().map(|(_, s)| *s).collect();
