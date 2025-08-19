@@ -17,6 +17,7 @@ ark-r1cs-std = "0.4.0"
 ark-grumpkin = "0.4.0"
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1.3"
+crossbeam = "0.8.4"
 
 rayon = "1.10.0"
 sha3 = { version = "0.10", default-features = false }
@@ -28,6 +29,7 @@ digest = "0.10.7"
 num = "0.4.3"
 itertools = "0.12.1"
 sha2 = "0.10.9"
+ark-vesta = "0.4.0"
 
 [patch.crates-io]
 ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", rev = "d27a5c8" }
@@ -70,6 +72,11 @@ name = "msm"
 [[bench]]
 harness = false
 name = "emsm"
+
+[[bench]]
+harness = false
+name = "malicious_emsm"
+
 
 [[bench]]
 harness = false

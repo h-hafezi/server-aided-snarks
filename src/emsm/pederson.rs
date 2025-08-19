@@ -1,4 +1,4 @@
-use ark_ec::{CurveGroup, ScalarMul, VariableBaseMSM};
+use ark_ec::{CurveGroup, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;

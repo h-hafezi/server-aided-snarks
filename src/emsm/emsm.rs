@@ -1,4 +1,3 @@
-use std::ops::{Neg, Sub};
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use crate::emsm::dual_lpn::{DualLPNInstance};
