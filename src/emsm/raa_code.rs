@@ -4,7 +4,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::ops::{AddAssign, SubAssign};
 use rayon::prelude::ParallelSliceMut;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator};
 use rayon::iter::ParallelIterator;
 
 #[derive(Debug, Clone)]

@@ -23,6 +23,9 @@ fn bench_malicious_emsm(c: &mut Criterion) {
         (1 << 20, 277),
         (1 << 21, 273),
         (1 << 22, 270),
+        (1 << 23, 266),
+        (1 << 24, 263),
+        (1 << 25, 259),
     ];
 
     for (n, k) in &params {
