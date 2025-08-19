@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 ark-std = "0.4.0"
-ark-ff = "0.4.0"
-ark-ec = "0.4.2"
+ark-ec = {version = "0.4.0", features = ["std", "parallel"] }
+ark-ff = {version = "0.4.0", features = ["std", "asm", "parallel"] }
 ark-poly = "0.4.0"
 ark-serialize = "0.4.2"
 ark-crypto-primitives = { version = "^0.4.0", default-features = false, features = ["r1cs", "snark", "sponge", "crh"] }
@@ -30,6 +30,8 @@ num = "0.4.3"
 itertools = "0.12.1"
 sha2 = "0.10.9"
 ark-vesta = "0.4.0"
+
+
 
 [patch.crates-io]
 ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", rev = "d27a5c8" }

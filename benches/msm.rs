@@ -1,7 +1,7 @@
 use criterion::{Criterion, BenchmarkId, criterion_group, criterion_main};
 use ark_ff::UniformRand;
-use ark_vesta::{Fr, Projective as G1Projective};
-use ark_std::{test_rng, fs::File,};
+use ark_bn254::{Fr, G1Projective};
+use ark_std::{test_rng, fs::File};
 use std::fs;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
