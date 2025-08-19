@@ -517,64 +517,6 @@ where
         end_timer!(check_time, || format!("Result: {}", lhs == rhs));
         Ok(lhs == rhs)
     }
-
-    /// Check that each `proof_i` in `proofs` is a valid proof of evaluation for
-    /// `commitment_i` at `point_i`.
-    pub fn batch_check<R: RngCore>(
-        vk: &KZGVerifierKey<E>,
-        commitments: &[KZGCommitment<E>],
-        points: &[E::ScalarField],
-        values: &[E::ScalarField],
-        proofs: &[KZGProof<E>],
-        rng: &mut R,
-    ) -> Result<bool, Error> {
-        let check_time =
-            start_timer!(|| format!("Checking {} evaluation proofs", commitments.len()));
-
-        let mut total_c = <E::G1>::zero();
-        let mut total_w = <E::G1>::zero();
-
-        let combination_time = start_timer!(|| "Combining commitments and proofs");
-        let mut randomizer = E::ScalarField::one();
-        // Instead of multiplying g and gamma_g in each turn, we simply accumulate
-        // their coefficients and perform a final multiplication at the end.
-        let mut g_multiplier = E::ScalarField::zero();
-        let mut gamma_g_multiplier = E::ScalarField::zero();
-        for (((c, z), v), proof) in commitments.iter().zip(points).zip(values).zip(proofs) {
-            let w = proof.w;
-            let mut temp = w.mul(*z);
-            temp += &c.0;
-            let c = temp;
-            g_multiplier += &(randomizer * v);
-            if let Some(random_v) = proof.random_v {
-                gamma_g_multiplier += &(randomizer * &random_v);
-            }
-            total_c += &c.mul(randomizer);
-            total_w += &w.mul(randomizer);
-            // We don't need to sample randomizers from the full field,
-            // only from 128-bit strings.
-            randomizer = u128::rand(rng).into();
-        }
-        total_c -= &vk.g.mul(g_multiplier);
-        total_c -= &vk.gamma_g.mul(gamma_g_multiplier);
-        end_timer!(combination_time);
-
-        let to_affine_time = start_timer!(|| "Converting results to affine for pairing");
-        let affine_points = E::G1::normalize_batch(&[-total_w, total_c]);
-        let (total_w, total_c) = (affine_points[0], affine_points[1]);
-        end_timer!(to_affine_time);
-
-        let pairing_time = start_timer!(|| "Performing product of pairings");
-        let result = E::multi_pairing(
-            [total_w, total_c],
-            [vk.prepared_beta_h.clone(), vk.prepared_h.clone()],
-        )
-            .0
-            .is_one();
-        end_timer!(pairing_time);
-        end_timer!(check_time, || format!("Result: {}", result));
-        Ok(result)
-    }
 }
 
 fn skip_leading_zeros_and_convert_to_bigints<F: PrimeField, P: DenseUVPolynomial<F>>(
