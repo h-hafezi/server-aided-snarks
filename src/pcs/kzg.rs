@@ -8,7 +8,7 @@ use std::ops::{Add, AddAssign, Div, Mul};
 use ark_crypto_primitives::Error;
 use ark_ec::{AffineRepr, CurveGroup, ScalarMul, VariableBaseMSM};
 use ark_ec::pairing::Pairing;
-use ark_ff::{AdditiveGroup, One, PrimeField, Zero};
+use ark_ff::{AdditiveGroup, One, PrimeField};
 use ark_poly::DenseUVPolynomial;
 use ark_std::{end_timer, start_timer, UniformRand};
 use rand::RngCore;

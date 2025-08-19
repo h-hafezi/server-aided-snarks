@@ -68,7 +68,7 @@ pub fn permute_safe<T: Default + Copy + Send + Sync>(v: &mut [T], perm: &[usize]
     let mut res = vec![T::default(); v.len()];
 
     // Threshold for switching to parallel
-    const PARALLEL_THRESHOLD: usize = 1 << 16;
+    const PARALLEL_THRESHOLD: usize = 1 << 25;
 
     if v.len() > PARALLEL_THRESHOLD {
         // Parallel version using rayon
@@ -99,7 +99,7 @@ where
         return;
     }
 
-    const PARALLEL_THRESHOLD: usize = 1 << 19;
+    const PARALLEL_THRESHOLD: usize = 1 << 25;
 
     if n <= PARALLEL_THRESHOLD {
         // Serial case
@@ -151,7 +151,7 @@ where
 }
 
 fn apply_F_fold<F: PrimeField>(v: &Vec<F>) -> Vec<F> {
-    const PARALLEL_THRESHOLD: usize = 1 << 16; // 65,536 elements
+    const PARALLEL_THRESHOLD: usize = 1 << 25; // 65,536 elements
 
     assert_eq!(v.len() % 4, 0);
     let mut out = vec![F::zero(); v.len() / 4];

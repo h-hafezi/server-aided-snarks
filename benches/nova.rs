@@ -89,11 +89,6 @@ where
 
 fn nova(c: &mut Criterion) {
     let params = vec![
-        (1 << 15, 294usize),
-        (1 << 16, 291),
-        (1 << 17, 287),
-        (1 << 18, 284),
-        (1 << 19, 280),
         (1 << 20, 277),
         (1 << 21, 273),
         (1 << 22, 270),
@@ -222,5 +217,10 @@ fn nova(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, nova);
+criterion_group!{
+    name = benches;
+    config = Criterion::default().sample_size(10);
+    targets = nova
+}
+
 criterion_main!(benches);
