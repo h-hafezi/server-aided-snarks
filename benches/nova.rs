@@ -17,6 +17,7 @@ use server_aided_SNARK::nova::gadgets::r1cs::{
 };
 use server_aided_SNARK::nova::commitment::CommitmentScheme;
 use server_aided_SNARK::nova::poseidon::PoseidonHash;
+use std::thread;
 
 /// Generates a random constraint system
 fn generate_random_constraint_system<F: PrimeField>(
@@ -49,6 +50,9 @@ fn generate_random_constraint_system<F: PrimeField>(
     cs
 }
 
+
+/// Computes the cross-term vector `T`
+///
 /// Computes the cross-term vector `T`
 fn compute_T<G, C>(
     shape: &R1CSShape<G>,
@@ -87,8 +91,15 @@ where
         .collect()
 }
 
+
+
 fn nova(c: &mut Criterion) {
     let params = vec![
+        (1 << 10, 311usize),
+        (1 << 11, 308usize),
+        (1 << 12, 304usize),
+        (1 << 13, 301usize),
+        (1 << 14, 298usize),
         (1 << 15, 294usize),
         (1 << 16, 291),
         (1 << 17, 287),
@@ -149,24 +160,53 @@ fn nova(c: &mut Criterion) {
         let encrypted_witness = emsm_instance.mask_witness(&emsm_pp, witness.W.as_slice());
         let encrypted_msm = emsm_pp.server_computation(encrypted_witness.clone());
 
-        c.bench_function(&format!("EMSM commit_W - {}", label), |b| {
-            b.iter(|| {
-                let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
-                let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
-                let _ = emsm_instance.mask_witness(&emsm_pp, witness.W.as_slice());
-                let _ = emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone());
-            });
-        });
+        let m = *n / 2;
+        let emsm_pp2 = EmsmPublicParams::<ScalarField, G1Projective>::new(m, pp[0..m].to_vec());
+        let preprocessed_commitments2 = emsm_pp2.preprocess();
+        let noise2 = SparseVector::<ScalarField>::error_vec(m * 4, *k, &mut thread_rng());
+        let emsm_instance2 = DualLPNInstance::<ScalarField>::new(&emsm_pp2.t_operator, noise2.clone());
 
-
-        // Compute T
-        c.bench_function(&format!("compute_T - {}", label), |b| {
+        c.bench_function(&format!("EMSM+compute_T+extra_EMSM - {}", label), |b| {
             b.iter(|| {
-                let _ = compute_T(&shape, &relaxed_u, &relaxed_w, &instance, &witness);
+                thread::scope(|s| {
+                    // Thread 1: EMSM commit_W (with n*4)
+                    let t1 = s.spawn(|| {
+                        let noise = SparseVector::<ScalarField>::error_vec(n * 4, *k, &mut thread_rng());
+                        let emsm_instance =
+                            DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
+                        let _ = emsm_instance.mask_witness(&emsm_pp, witness.W.as_slice());
+                        let _ = emsm_instance.recompute_msm(
+                            &preprocessed_commitments,
+                            encrypted_msm.clone(),
+                        );
+                    });
+
+                    // Thread 2: compute_T
+                    let t2 = s.spawn(|| {
+                        let _ = compute_T(&shape, &relaxed_u, &relaxed_w, &instance, &witness);
+                    });
+
+                    // Thread 3: extra EMSM instantiation (with m*4)
+                    let t3 = s.spawn(|| {
+                        let noise = SparseVector::<ScalarField>::error_vec(m * 4, *k, &mut thread_rng());
+                        let _ = DualLPNInstance::<ScalarField>::new(&emsm_pp2.t_operator, noise.clone());
+                    });
+
+                    t1.join().unwrap();
+                    t2.join().unwrap();
+                    t3.join().unwrap();
+                });
             });
         });
 
         let t = compute_T(&shape, &relaxed_u, &relaxed_w, &instance, &witness);
+
+        // compute T
+        c.bench_function(&format!("compute t naively for naive client - {}", label), |b| {
+            b.iter(|| {
+                let _ = compute_T(&shape, &relaxed_u, &relaxed_w, &instance, &witness);
+            });
+        });
 
         // Commitment of T
         c.bench_function(&format!("commit_T - {}", label), |b| {
@@ -175,20 +215,13 @@ fn nova(c: &mut Criterion) {
             });
         });
 
-        let m = *n / 2;
-        let emsm_pp = EmsmPublicParams::<ScalarField, G1Projective>::new(m, pp[0..m].to_vec());
-        let preprocessed_commitments = emsm_pp.preprocess();
-        let noise = SparseVector::<ScalarField>::error_vec(m * 4, *k, &mut thread_rng());
-        let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
-        let encrypted_witness = emsm_instance.mask_witness(&emsm_pp, t.as_slice());
-        let encrypted_msm = emsm_pp.server_computation(encrypted_witness.clone());
+        let encrypted_witness2 = emsm_instance2.mask_witness(&emsm_pp2, t.as_slice());
+        let encrypted_msm2 = emsm_pp2.server_computation(encrypted_witness2.clone());
 
         c.bench_function(&format!("EMSM commit_T - {}", label), |b| {
             b.iter(|| {
-                let noise = SparseVector::<ScalarField>::error_vec(m * 4, *k, &mut thread_rng());
-                let emsm_instance = DualLPNInstance::<ScalarField>::new(&emsm_pp.t_operator, noise.clone());
-                let _ = emsm_instance.mask_witness(&emsm_pp, t.as_slice());
-                let _ = emsm_instance.recompute_msm(&preprocessed_commitments, encrypted_msm.clone());
+                let _ = emsm_instance2.mask_witness(&emsm_pp2, t.as_slice());
+                let _ = emsm_instance2.recompute_msm(&preprocessed_commitments2, encrypted_msm2.clone());
             });
         });
 

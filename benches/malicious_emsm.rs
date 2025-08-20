@@ -15,6 +15,11 @@ fn bench_malicious_emsm(c: &mut Criterion) {
     let mut rng = thread_rng();
 
     let params = vec![
+        (1 << 10, 311usize),
+        (1 << 11, 308usize),
+        (1 << 12, 304usize),
+        (1 << 13, 301usize),
+        (1 << 14, 298usize),
         (1 << 15, 294usize),
         (1 << 16, 291),
         (1 << 17, 287),
