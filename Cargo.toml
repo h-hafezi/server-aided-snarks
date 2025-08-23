@@ -94,6 +94,11 @@ name = "accumulate"
 
 [[bench]]
 harness = false
+name = "kzg"
+
+
+[[bench]]
+harness = false
 name = "permutation"
 
 [[bench]]

@@ -178,14 +178,14 @@ impl<F: PrimeField, P: DenseUVPolynomial<F>> KZGRandomness<F, P> {
 }
 
 impl<F: PrimeField, P: DenseUVPolynomial<F>> KZGRandomness<F, P> {
-    fn empty() -> Self {
+    pub fn empty() -> Self {
         Self {
             blinding_polynomial: P::zero(),
             _field: PhantomData,
         }
     }
 
-    fn rand<R: RngCore>(hiding_bound: usize, _: bool, _: Option<usize>, rng: &mut R) -> Self {
+    pub fn rand<R: RngCore>(hiding_bound: usize, _: bool, _: Option<usize>, rng: &mut R) -> Self {
         let mut randomness = KZGRandomness::empty();
         let hiding_poly_degree = Self::calculate_hiding_polynomial_degree(hiding_bound);
         randomness.blinding_polynomial = P::rand(hiding_poly_degree, rng);
@@ -209,7 +209,7 @@ for KZGRandomness<F, P>
     type Output = Self;
 
     #[inline]
-    fn add(mut self, other: (F, &'a KZGRandomness<F, P>)) -> Self {
+     fn add(mut self, other: (F, &'a KZGRandomness<F, P>)) -> Self {
         self += other;
         self
     }
@@ -219,7 +219,7 @@ impl<'a, F: PrimeField, P: DenseUVPolynomial<F>> AddAssign<&'a KZGRandomness<F, 
 for KZGRandomness<F, P>
 {
     #[inline]
-    fn add_assign(&mut self, other: &'a Self) {
+     fn add_assign(&mut self, other: &'a Self) {
         self.blinding_polynomial += &other.blinding_polynomial;
     }
 }
@@ -228,7 +228,7 @@ impl<'a, F: PrimeField, P: DenseUVPolynomial<F>> AddAssign<(F, &'a KZGRandomness
 for KZGRandomness<F, P>
 {
     #[inline]
-    fn add_assign(&mut self, (f, other): (F, &'a KZGRandomness<F, P>)) {
+     fn add_assign(&mut self, (f, other): (F, &'a KZGRandomness<F, P>)) {
         self.blinding_polynomial += (f, &other.blinding_polynomial);
     }
 }
@@ -428,7 +428,7 @@ where
         Ok((witness_polynomial, random_witness_polynomial))
     }
 
-    pub(crate) fn open_with_witness_polynomial<'a>(
+    pub fn open_with_witness_polynomial<'a>(
         powers: &KZGPowers<E>,
         point: P::Point,
         randomness: &KZGRandomness<E::ScalarField, P>,
