@@ -96,6 +96,10 @@ name = "accumulate"
 harness = false
 name = "kzg"
 
+[[bench]]
+harness = false
+name = "dual_steps"
+
 
 [[bench]]
 harness = false
