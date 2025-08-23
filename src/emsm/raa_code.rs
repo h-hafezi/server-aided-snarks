@@ -111,8 +111,8 @@ where
         return;
     }
 
-    // Parallel case
-    let num_chunks = (rayon::current_num_threads() * 4).min(n);
+    // Use at most 2 chunks (since 2 vCPUs)
+    let num_chunks = rayon::current_num_threads().min(n);
     let chunk_size = (n + num_chunks - 1) / num_chunks;
 
     // Step 1: Compute partial suffix sums in each chunk (right-to-left)
