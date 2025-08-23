@@ -29,7 +29,7 @@ fn bench_multiply_sparse<F: PrimeField>(c: &mut Criterion, t_operator: &TOperato
 }
 
 // Criterion entry
-pub fn criterion_benchmark(c: &mut Criterion) {ش
+pub fn criterion_benchmark(c: &mut Criterion) {
     let params = vec![
         (1 << 10, 2 * 311usize),
         (1 << 11, 2 * 308),
