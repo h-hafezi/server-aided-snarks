@@ -57,11 +57,7 @@ fn bench_emsm(c: &mut Criterion) {
         let witness = (0..*n).map(|_| F::rand(&mut rng)).collect::<Vec<F>>();
         let encrypted_witness = emsm_instance.mask_witness(&pp, witness.as_slice());
         let encrypted_msm = pp.server_computation(encrypted_witness.clone());
-
-        c.bench_with_input(BenchmarkId::new("preprocessing", n), n, |b, &_n| {
-            b.iter(|| black_box(pp.preprocess()));
-        });
-
+        
         let preprocessed_commitments = pp.preprocess();
 
         // ------------------- Benchmarks -------------------
