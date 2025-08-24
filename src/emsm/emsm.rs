@@ -1,8 +1,11 @@
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
+use rayon::*;
+use rayon::iter::IntoParallelRefIterator;
 use crate::emsm::dual_lpn::{DualLPNInstance};
 use crate::emsm::pederson::Pedersen;
 use crate::emsm::raa_code::{accumulate_inplace, inverse_permutation, permute_safe, TOperator};
+use rayon::iter::ParallelIterator;
 
 #[derive(Debug, Clone)]
 pub struct EmsmPublicParams<F, G>
@@ -70,13 +73,13 @@ impl<F, G> EmsmPublicParams<F, G> where
         let generators = &self.pedersen.generators;
 
         // 1. Expand each generator 4 times
-        let mut expanded = Vec::with_capacity(generators.len() * 4);
-        for g in generators.iter() {
-            expanded.push(g.clone().into());
-            expanded.push(g.clone().into());
-            expanded.push(g.clone().into());
-            expanded.push(g.clone().into());
-        }
+        let mut expanded: Vec<_> = generators
+            .par_iter()
+            .flat_map(|g| {
+                let v = g.clone().into();
+                vec![v.clone(), v.clone(), v.clone(), v]
+            })
+            .collect();
 
         // 2. Inverse permutation p and apply permute_safe
         let p_inv = inverse_permutation(self.t_operator.p.as_slice());

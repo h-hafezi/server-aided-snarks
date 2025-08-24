@@ -4,7 +4,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::ops::{AddAssign, SubAssign};
 use rayon::prelude::ParallelSliceMut;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator};
 use rayon::iter::ParallelIterator;
 
 #[derive(Debug, Clone)]
@@ -68,7 +68,7 @@ pub fn permute_safe<T: Default + Copy + Send + Sync>(v: &mut [T], perm: &[usize]
     let mut res = vec![T::default(); v.len()];
 
     // Threshold for switching to parallel
-    const PARALLEL_THRESHOLD: usize = 1 << 25;
+    const PARALLEL_THRESHOLD: usize = 1 << 16;
 
     if v.len() > PARALLEL_THRESHOLD {
         // Parallel version using rayon
@@ -99,7 +99,7 @@ where
         return;
     }
 
-    const PARALLEL_THRESHOLD: usize = 1 << 25;
+    const PARALLEL_THRESHOLD: usize = 1 << 16;
 
     if n <= PARALLEL_THRESHOLD {
         // Serial case
