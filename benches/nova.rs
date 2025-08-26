@@ -166,6 +166,7 @@ fn nova(c: &mut Criterion) {
         let noise2 = SparseVector::<ScalarField>::error_vec(m * 4, *k, &mut thread_rng());
         let emsm_instance2 = DualLPNInstance::<ScalarField>::new(&emsm_pp2.t_operator, noise2.clone());
 
+        // we use the dual_lpn instance generation of the other MSM in this bench so we can parallelise them
         c.bench_function(&format!("EMSM+compute_T+extra_EMSM - {}", label), |b| {
             b.iter(|| {
                 thread::scope(|s| {
@@ -201,7 +202,7 @@ fn nova(c: &mut Criterion) {
 
         let t = compute_T(&shape, &relaxed_u, &relaxed_w, &instance, &witness);
 
-        // compute T
+        // compute T naively for the baseline bench of the client
         c.bench_function(&format!("compute t naively for naive client - {}", label), |b| {
             b.iter(|| {
                 let _ = compute_T(&shape, &relaxed_u, &relaxed_w, &instance, &witness);
@@ -218,6 +219,7 @@ fn nova(c: &mut Criterion) {
         let encrypted_witness2 = emsm_instance2.mask_witness(&emsm_pp2, t.as_slice());
         let encrypted_msm2 = emsm_pp2.server_computation(encrypted_witness2.clone());
 
+        // the dual_lpn creation has already happened above, that's why we don't include it here again
         c.bench_function(&format!("EMSM commit_T - {}", label), |b| {
             b.iter(|| {
                 let _ = emsm_instance2.mask_witness(&emsm_pp2, t.as_slice());

@@ -1,3 +1,5 @@
+// This bench helps to know what is the threshold for parallelism, e.g. if |vec| > 2^n use parallelism
+
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, black_box};
 use rand::thread_rng;
 use rayon::prelude::*;
